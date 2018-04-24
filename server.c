@@ -24,11 +24,8 @@
 struct Node{
 	int id;
 	int active;
-	char name[15];
-	
-
+	char name[15];	
 };
-
 //process arrays
 void printProcessArray(int fd);
 
