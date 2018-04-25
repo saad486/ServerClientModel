@@ -12,6 +12,39 @@
 #include<errno.h>
 #include<sys/ioctl.h>
 #include<strings.h>
+struct Node{
+	int id;
+	int active;
+	char name[50];
+};
+
+void printProcessArray(); 
+
+struct nodeProcessArray{
+
+	int processCounter;
+	
+	struct Node processArray[30];
+
+};
+
+struct nodeProcessArray processListing;
+
+void printProcessArray()
+{
+	char buff[1000];
+	int count = 0;
+	
+	for(int i = 0; i<processListing.processCounter;i++)
+		{
+			count += sprintf(&buff[count],"Process ID = %d, Active = %d, Process Name = %s\n",processListing.processArray[i].id,processListing.processArray[i].active,processListing.processArray[i].name);
+		}
+	//buff[count] = '\0';
+	
+	count++;
+	
+	write(STDOUT_FILENO, buff, count);
+}
 
 int main(int argc, char * argv[])
 {
@@ -53,7 +86,11 @@ int main(int argc, char * argv[])
 		int readFromScreen = read(STDIN_FILENO, writeBuff,100);
 		
 		write(sock , writeBuff, readFromScreen);
-
+		
+		//writeBuff[readFromScreen - 1] = '\0';
+		
+		char * token = strtok(writeBuff,"  \n");
+		
 		char readBuff;
 		
 		int readFromSocket = 0;
@@ -67,7 +104,6 @@ int main(int argc, char * argv[])
 		int status;
 	
 		do{
-		
 				readFromSocket = read(sock,&readBuff,1);
 			
 				readWriteBuff[count] = readBuff;
@@ -77,7 +113,16 @@ int main(int argc, char * argv[])
 				ioctl(sock,FIONREAD, &status);
 		
 		}while(status != 0);
-				write(STDOUT_FILENO, readWriteBuff,count);
+		
+		if((strcasecmp("list",token) == 0) && (count == sizeof(struct nodeProcessArray)))
+		{
+			printf("size = %s\n",token);
+			memcpy(&processListing, readWriteBuff, count);
+			printProcessArray();	
+				
+		}
+
+		else write(STDOUT_FILENO, readWriteBuff,count);
 		
 		free(writeBuff);
 	

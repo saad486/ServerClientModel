@@ -24,8 +24,17 @@
 struct Node{
 	int id;
 	int active;
-	char name[15];	
+	char name[50];
 };
+
+struct nodeProcessArray{
+
+	int processCounter;
+	
+	struct Node processArray[30];
+
+};
+
 //process arrays
 void printProcessArray(int fd);
 
@@ -34,9 +43,8 @@ void printActiveProcessArray(int fd);
 //making process appear in active in list
 void removeProcess(int processID);
 
-//Node array 
-struct Node * processArray[30];//if typed exit then it will be freed
-int processCounter = 0;
+//struct definition
+struct nodeProcessArray processListing;
 
 int checkDigit(char * token);
 
@@ -84,8 +92,6 @@ char* methodArithmetic(char * token, char * buff)
 			
 			return buff;
 		}
-	
-	
 	
 	while(token != NULL)
 	{
@@ -145,7 +151,6 @@ char* methodArithmetic(char * token, char * buff)
 			token = strtok(NULL," \n");
 		}
 		
-	
 	if(check == 0)
 		strcpy(buff,"Invalid arguments\n");
 	
@@ -167,7 +172,6 @@ char* methodArithmetic(char * token, char * buff)
 		 	}
 		
 	return buff; 	
-
 }	
 
 int checkDigit(char * token)
@@ -197,21 +201,10 @@ int checkDigit(char * token)
 
 void printArray(int fd)
 {	
-	int i = 0;
-	
-	char buff[2000];
-	
-	int count = 0;
-	
-	for(;i<processCounter;i++)
-		{
-			count += sprintf(&buff[count],"Process ID = %d , Active = %d, Process name = %s\n",processArray[i]-> id,processArray[i]->active,processArray[i]->name);
-		}
-	
-		write(fd,buff,count);
+		write(fd,&processListing,sizeof(struct nodeProcessArray));
 }
 
-void printActiveArray(int fd)
+/*void printActiveArray(int fd)
 {
 	int i = 0;
 	
@@ -239,22 +232,23 @@ void printActiveArray(int fd)
 		write(fd,buff,count);
 	
 	else write(fd,"Currently no active processes listed\n",strlen("Currently no active processes listed\n"));	
-}
+}*/
 
 void removeProcess(int pid)
 {
 	int i;
 	
-	for(i = 0; i<processCounter;i++)
+	for(i = 0; i<processListing.processCounter;i++)
 	{
-		if(processArray[i]->id == pid)
+		if(processListing.processArray[i].id == pid)
 		{ 
-				processArray[i]->active = 0;
+				processListing.processArray[i].active = 0;
 			  
 				break;
 		}		
 	}
 }
+
 //#######Server###############
 int main()
 {
@@ -264,7 +258,8 @@ int main()
 	int readCountSocket = 1;
 	int msgsock;
 	char * runArray[20];
-
+	processListing.processCounter = 0;
+	
 	int i;	
 	
 	/*Implementing SIGCHLD handling in signalhandler*/
@@ -433,23 +428,14 @@ int main()
 						}	
 						else if(strcasecmp("list",token) == 0)
 						{
-							if(processCounter > 0)
+							if(processListing.processCounter > 0)
 								{	
 									token = strtok(NULL," \n");
 			
 									if(token == NULL)
-										printActiveArray(msgsock);
+										printArray(msgsock);
 					
-									else if(strcmp(token,"all") == 0)	//check why tokenizing first and checking caused the problem
-									{	
-										if((token = strtok(NULL," \n")) == NULL)
-												printArray(msgsock);
-						
 										else write(msgsock,"Invalid command\n",strlen("Invalid command\n"));
-									}
-	
-									else write(msgsock,"Invalid command\n",strlen("Invalid command\n"));
-	
 								}	
 								
 							else write(msgsock,"List is currently Empty\n",strlen("List is currently Empty\n"));	
@@ -564,11 +550,14 @@ int main()
 										if(count == 0)
 											{
 					
-												processArray[processCounter] = (struct Node *)(malloc(50*sizeof(struct Node))); 
-												processArray[processCounter] -> id = serverPid;
-												strcpy(processArray[processCounter] -> name, runArray[0]);
-												processArray[processCounter] -> active = 1;
-												processCounter++;
+												processListing.processArray[processListing.processCounter].id = serverPid;
+												
+												strcpy(processListing.processArray[processListing.processCounter].name, runArray[0]);
+												
+												processListing.processArray[processListing.processCounter].active = 1;
+												
+												processListing.processCounter++;
+												
 										  		write(msgsock,"Executing...\n",strlen("Executing...\n"));
 										  		
 											}	
@@ -581,9 +570,6 @@ int main()
 									close(sd[0]);	
 									
 									}	
-									
-						
-						
 							}
 						
 						for(int j = 0 ;j<argumentRunArray; j++)
@@ -597,22 +583,11 @@ int main()
 						
 						token = NULL;
 						
-					}while(readCountSocket != 0); 
-					
-				
-
-				write(STDOUT_FILENO , "SAAD\n",5);
+					}while(readCountSocket != 0);
+					 
 				close(msgsock);
 			}
-		
-		else if(serverChild > 0)
-		{
-			/*int status;
-			
-			int pid = waitpid(serverChild, &status, WNOHANG);*/
-			
-		}
-
+	
 	}while(TRUE);
 
 }
