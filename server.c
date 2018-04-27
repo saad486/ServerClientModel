@@ -352,7 +352,6 @@ int main()
 						if(readCountSocket == 0)
 						 		{
 						 			write(STDOUT_FILENO, "Connection ended\n",strlen("Connection ended\n"));
-						 			
 						 			kill(getpid(),SIGTERM);
 								}
 					
@@ -503,7 +502,15 @@ int main()
 									
 							else write(msgsock,MESSAGE,strlen(MESSAGE));		
 						}
-							
+						else if(strcasecmp("exit",token) == 0)
+						{
+							token = strtok(NULL," \n");
+		
+							if(token == NULL)
+								write(msgsock,"Connection terminated\n",strlen("Connection terminated\n"));
+									
+							else write(msgsock,MESSAGE,strlen(MESSAGE));		
+						}
 						else{
 							writeCountSocket = write(msgsock, "Invalid command\n", strlen("Invalid command\n"));
 						}
@@ -598,10 +605,6 @@ int main()
 						token = NULL;
 						
 					}while(readCountSocket != 0); 
-					
-				
-
-				write(STDOUT_FILENO , "SAAD\n",5);
 				close(msgsock);
 			}
 		

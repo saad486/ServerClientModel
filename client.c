@@ -69,6 +69,12 @@ int main(int argc, char * argv[])
 		do{
 		
 				readFromSocket = read(sock,&readBuff,1);
+				
+				if(readFromSocket == 0)
+				  {
+				  	write(STDOUT_FILENO,"Connection ended\n",strlen("Connection ended\n"));
+				  	exit(EXIT_SUCCESS);
+				  }
 			
 				readWriteBuff[count] = readBuff;
 	
@@ -78,6 +84,9 @@ int main(int argc, char * argv[])
 		
 		}while(status != 0);
 				write(STDOUT_FILENO, readWriteBuff,count);
+				
+		if(strcmp("Connection terminated\n",readWriteBuff) == 0)
+			exit(0);							
 		
 		free(writeBuff);
 	
