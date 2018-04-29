@@ -317,6 +317,7 @@ int main()
 			{
 			
 				do{
+						
 						char readBuffSocket[100];
 						
 						bzero(readBuffSocket,100);

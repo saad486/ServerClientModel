@@ -12,13 +12,33 @@
 #include<errno.h>
 #include<sys/ioctl.h>
 #include<strings.h>
+#include<pthread.h>
+
+struct writeStructure{
+	
+char * writeStructureBuff;
+int writeCount;
+int socketNumber;
+
+};
+struct readStructure{
+	
+char * readStructureBuff;
+int socketNumber;
+
+};
+
+
+
+void * readThread(void *ptr);
+
+void * writeThread(void *ptr);
 
 int main(int argc, char * argv[])
 {
 	int sock;
 	struct sockaddr_in server;
 	struct hostent *hp;
-	char buf[1024];
 	
 	/*Create socker*/
 	sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -44,54 +64,67 @@ int main(int argc, char * argv[])
 			perror("connect to stream socket");
 			exit(0);
 		}
-		
+	/*create threads*/	
+	pthread_t thread1, thread2;
+	pthread_attr_t myattr;
+	pthread_attr_init(&myattr);
+	pthread_attr_setdetachstate(&myattr , PTHREAD_CREATE_DETACHED);
 	
 	while(1)
 	{
-		char * writeBuff = (char *)malloc(100 * sizeof(char));
+		char *writeBuff = (char *)malloc(100 * sizeof(char));
+		struct writeStructure writeObject;
+		int readFromScreen = read(STDIN_FILENO, writeBuff, 100);
+		writeObject.writeStructureBuff = writeBuff;
+		writeObject.writeCount = readFromScreen;
+		writeObject.socketNumber = sock;
+		int iret1 = pthread_create(&thread1, &myattr,readThread,(void *)&writeObject);
 		
-		int readFromScreen = read(STDIN_FILENO, writeBuff,100);
+		struct readStructure readObject;
+		char *readBuff = (char *)malloc(1000 * sizeof(char));
+		readObject.readStructureBuff = readBuff;
+		readObject.socketNumber = sock;
+		int iret2 = pthread_create(&thread2, NULL,writeThread,(void *)&readObject);
 		
-		write(sock , writeBuff, readFromScreen);
-
-		char readBuff;
+		void * r1;
+		pthread_join(thread2, &r1);
 		
-		int readFromSocket = 0;
-		
-		int count = 0;
-		
-		char readWriteBuff[100];
-		
-		bzero(readWriteBuff,100);
-		
-		int status;
-	
-		do{
-		
-				readFromSocket = read(sock,&readBuff,1);
-				
-				if(readFromSocket == 0)
-				  {
-				  	write(STDOUT_FILENO,"Connection ended\n",strlen("Connection ended\n"));
-				  	exit(EXIT_SUCCESS);
-				  }
-			
-				readWriteBuff[count] = readBuff;
-	
-				count++;
-		
-				ioctl(sock,FIONREAD, &status);
-		
-		}while(status != 0);
-				write(STDOUT_FILENO, readWriteBuff,count);
-				
-		if(strcmp("Connection terminated\n",readWriteBuff) == 0)
-			exit(0);							
+		int *readCount = (int *)r1;
+		write(STDOUT_FILENO, readObject.readStructureBuff, *readCount);
 		
 		free(writeBuff);
-	
+		free(readBuff);
+		free(readCount);
 	}
 	
 	close(sock);
 
 }
+
+void * readThread(void *ptr)
+{
+	struct writeStructure * writeObject = (struct writeStructure *)ptr;
+	
+	int writeCount = write(writeObject->socketNumber, writeObject->writeStructureBuff, writeObject->writeCount);
+	
+	if(writeCount == -1)
+		{
+			perror("error");
+		}
+}
+void * writeThread(void *ptr)
+{
+	struct readStructure * readObject = (struct readStructure *)ptr;
+	
+	struct readStructure readStruct = *readObject;
+	
+	int readCount = read(readStruct.socketNumber, readStruct.readStructureBuff, 1000);
+	
+	int * count = (int *)malloc(sizeof(4));
+	
+	*count = readCount;
+	
+	pthread_exit((void *)count);
+}	
+	
+	
