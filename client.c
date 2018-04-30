@@ -14,22 +14,6 @@
 #include<strings.h>
 #include<pthread.h>
 
-struct writeStructure{
-	
-char * writeStructureBuff;
-int writeCount;
-int socketNumber;
-
-};
-struct readStructure{
-	
-char * readStructureBuff;
-int socketNumber;
-
-};
-
-
-
 void * readThread(void *ptr);
 
 void * writeThread(void *ptr);
