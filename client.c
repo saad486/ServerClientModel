@@ -120,7 +120,7 @@ void * writeThread(void *ptr)
 	
 	int readCount = read(readStruct.socketNumber, readStruct.readStructureBuff, 1000);
 	
-	int * count = (int *)malloc(sizeof(4));
+	int * count = (int *)malloc(sizeof(int));
 	
 	*count = readCount;
 	
