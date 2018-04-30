@@ -14,6 +14,10 @@
 #include<strings.h>
 #include<pthread.h>
 
+void * readThread(void *ptr);
+
+void * writeThread(void *ptr);
+
 int main(int argc, char * argv[])
 {
 	int sock;
@@ -46,9 +50,9 @@ int main(int argc, char * argv[])
 		}
 	/*create threads*/	
 	pthread_t thread1, thread2;
-	pthread_attr_t myattr;
+	/*pthread_attr_t myattr;
 	pthread_attr_init(&myattr);
-	pthread_attr_setdetachstate(&myattr , PTHREAD_CREATE_DETACHED);
+	pthread_attr_setdetachstate(&myattr , PTHREAD_CREATE_DETACHED);*/
 	
 	int iret1 = pthread_create(&thread1, NULL,readThread,(void *)&sock);
 		
