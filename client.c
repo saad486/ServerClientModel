@@ -14,10 +14,6 @@
 #include<strings.h>
 #include<pthread.h>
 
-void * readThread(void *ptr);
-
-void * writeThread(void *ptr);
-
 int main(int argc, char * argv[])
 {
 	int sock;
