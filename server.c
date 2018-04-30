@@ -317,7 +317,6 @@ int main()
 			{
 			
 				do{
-						
 						char readBuffSocket[100];
 						
 						bzero(readBuffSocket,100);
@@ -508,8 +507,10 @@ int main()
 							token = strtok(NULL," \n");
 		
 							if(token == NULL)
-								write(msgsock,"Connection terminated\n",strlen("Connection terminated\n"));
-									
+									{	write(msgsock,"Connection terminated\n",strlen("Connection terminated\n"));
+										write(STDOUT_FILENO,"Connection terminated\n",strlen("Connection terminated\n"));
+										exit(EXIT_SUCCESS);
+									}
 							else write(msgsock,MESSAGE,strlen(MESSAGE));		
 						}
 						else{

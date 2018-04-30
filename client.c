@@ -70,32 +70,13 @@ int main(int argc, char * argv[])
 	pthread_attr_init(&myattr);
 	pthread_attr_setdetachstate(&myattr , PTHREAD_CREATE_DETACHED);
 	
-	while(1)
-	{
-		char *writeBuff = (char *)malloc(100 * sizeof(char));
-		struct writeStructure writeObject;
-		int readFromScreen = read(STDIN_FILENO, writeBuff, 100);
-		writeObject.writeStructureBuff = writeBuff;
-		writeObject.writeCount = readFromScreen;
-		writeObject.socketNumber = sock;
-		int iret1 = pthread_create(&thread1, &myattr,readThread,(void *)&writeObject);
+	int iret1 = pthread_create(&thread1, NULL,readThread,(void *)&sock);
 		
-		struct readStructure readObject;
-		char *readBuff = (char *)malloc(1000 * sizeof(char));
-		readObject.readStructureBuff = readBuff;
-		readObject.socketNumber = sock;
-		int iret2 = pthread_create(&thread2, NULL,writeThread,(void *)&readObject);
-		
-		void * r1;
-		pthread_join(thread2, &r1);
-		
-		int *readCount = (int *)r1;
-		write(STDOUT_FILENO, readObject.readStructureBuff, *readCount);
-		
-		free(writeBuff);
-		free(readBuff);
-		free(readCount);
-	}
+	int iret2 = pthread_create(&thread2, NULL,writeThread,(void *)&sock);
+	
+	pthread_join(thread1,NULL);
+	pthread_join(thread2,NULL);
+	
 	
 	close(sock);
 
@@ -103,28 +84,56 @@ int main(int argc, char * argv[])
 
 void * readThread(void *ptr)
 {
-	struct writeStructure * writeObject = (struct writeStructure *)ptr;
+	int * sock = (int *)ptr;
 	
-	int writeCount = write(writeObject->socketNumber, writeObject->writeStructureBuff, writeObject->writeCount);
+	while(1)
+		{	
+			char writeBuff[1000];
+		
+			int readFromScreen = read(STDIN_FILENO, writeBuff, 1000);
 	
-	if(writeCount == -1)
-		{
-			perror("error");
-		}
+			if(readFromScreen == -1)
+			{
+				perror("error");
+			}
+			
+			int writeCount = write(*sock, writeBuff, readFromScreen);
+			
+			if(writeCount == -1)
+				perror("error");
+			
+		}	
 }
 void * writeThread(void *ptr)
 {
-	struct readStructure * readObject = (struct readStructure *)ptr;
+	int * sock = (int *)ptr;
+		
+	while(1)
+	{
+			char readBuff[1000];
+			
+			int readFromSocket  = read(*sock, readBuff, 1000);
+		
+			if(readFromSocket == -1)
+			{
+				perror("error");
+			}
+			
+			int writeCount = write(STDOUT_FILENO, readBuff, readFromSocket);
+			
+			readBuff[writeCount] = '\0';
+			
+			if(strcmp("Connection terminated\n",readBuff) == 0)
+				{
+					exit(EXIT_SUCCESS);
+				}
+			
+			if(readFromSocket == -1)
+				perror("error");
+			
+	}	
+		
+}
 	
-	struct readStructure readStruct = *readObject;
-	
-	int readCount = read(readStruct.socketNumber, readStruct.readStructureBuff, 1000);
-	
-	int * count = (int *)malloc(sizeof(int));
-	
-	*count = readCount;
-	
-	pthread_exit((void *)count);
-}	
 	
 	
