@@ -26,6 +26,19 @@
 //thread1
 void * acceptConnections(void * ptr);
 
+struct showIpAndPortNode{
+
+	int portNo;
+	char ipAddress[INET_ADDRSTRLEN];
+	
+};
+
+struct ipAndPortArrayNode{
+	
+	int connectionNo;
+	struct showIpAndPortNode ipAndPortArray[30];
+};
+
 struct acceptConnectionsNode{
 	
 	int identifier;
@@ -275,7 +288,6 @@ int main()
 	struct sockaddr_in server, client;
 	int writeCountSocket = 0;
 	int readCountSocket = 1;
-	int msgsock;
 	char * runArray[20];
 
 	int i;	
@@ -335,13 +347,15 @@ int main()
 		int iret1 = pthread_create(&connectThread, NULL ,acceptConnections,(void *)&connector);
 		
 		//waiting for the thread
-		void *r1;
+		void *readMessage;
 		
-		pthread_join(connectThread, &r1);
+		pthread_join(connectThread, &readMessage);
 		
-		int * messageID = (int *)r1;
+		int *messageID = (int *)readMessage;
+	
+		int msgsock =  *messageID;
 		
-		int msgsock = *messageID;		
+		free(messageID);
 		
 		int serverChild = fork();
 		
@@ -671,11 +685,27 @@ void * acceptConnections(void * ptr)
 	
 	struct acceptConnectionsNode *acceptConnector;
 	
+	struct showIpAndPortNode ipAndPortStorage;
+	
+	struct ipAndPortArrayNode ipAndPortStoreArray;
+	
 	acceptConnector = (struct acceptConnectionsNode *) ptr;
 	
-	*sock = accept(acceptConnector->identifier,(struct sockaddr *)&acceptConnector->clientAddr, &acceptConnector->lengthClient);
+	int returnValue = accept(acceptConnector->identifier,(struct sockaddr *)&acceptConnector->clientAddr, &acceptConnector->lengthClient);
+		
+	*sock = returnValue;
 	
-	pthread_exit((void *)sock);//return something
+	char str[INET_ADDRSTRLEN];
+
+	inet_ntop(AF_INET, (void *)&acceptConnector->clientAddr.sin_addr.s_addr, str,INET_ADDRSTRLEN);
+
+	ipAndPortStoreArray.ipAndPortArray[ipAndPortStoreArray.connectionNo].portNo = ntohs(acceptConnector->clientAddr.sin_port);
+
+	strcpy(ipAndPortStoreArray.ipAndPortArray[ipAndPortStoreArray.connectionNo].ipAddress,str);
+
+	ipAndPortStoreArray.connectionNo++;
+	
+	pthread_exit((void *)sock);//return struct
 	
 }
 
