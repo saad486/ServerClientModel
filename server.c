@@ -13,6 +13,7 @@
 #include<strings.h>
 #include<signal.h>
 #include<sys/ioctl.h>
+#include<pthread.h>
 #include <arpa/inet.h>
 
 #define TRUE 1
@@ -21,6 +22,17 @@
 #define MESSAGE "Invalid command, type help\n"
 #define NOELEMENTS "No elements in the list\n"
 #define HELP "=========================\nWelcome to our program guide:\nType add number1 number2 ...\nType sub number1 number2 ...\nType mult number1 number2 ...\nType div number1 number2 ...\nType run argument1 ...\nType list : To view currenly running processes and list[ all] for all processes executed\nType kill PID, to kill an actively running prcocess\nType exit : to exit our program\nNote: All the operations are not case-sensitve, example: Add, aDD, ADd are valid\nMinimun number of inputs for arthimetic operation is Two\n=========================\n"
+
+//thread1
+void * acceptConnections(void * ptr);
+
+struct acceptConnectionsNode{
+	
+	int identifier;
+	struct sockaddr_in clientAddr;
+	int lengthClient;
+		
+};
 
 struct Node{
 	int id;
@@ -260,7 +272,7 @@ void removeProcess(int pid)
 int main()
 {
 	int sock, length;
-	struct sockaddr_in server;
+	struct sockaddr_in server, client;
 	int writeCountSocket = 0;
 	int readCountSocket = 1;
 	int msgsock;
@@ -310,17 +322,34 @@ int main()
 	listen(sock, 5);
 	
 	do{
-		msgsock = accept(sock, 0 , 0);
+		pthread_t connectThread;
 		
-		if(msgsock == -1)
-			perror("error accepting");
-
+		int clientLength = sizeof(client);
+		
+		//connector Node setting which will be passed to connectThread
+		struct acceptConnectionsNode connector;
+		connector.identifier = sock;
+		connector.clientAddr = client;
+		connector.lengthClient = clientLength;
+		
+		int iret1 = pthread_create(&connectThread, NULL ,acceptConnections,(void *)&connector);
+		
+		//waiting for the thread
+		void *r1;
+		
+		pthread_join(connectThread, &r1);
+		
+		int * messageID = (int *)r1;
+		
+		int msgsock = *messageID;		
+		
 		int serverChild = fork();
 		
 		if(serverChild == 0)
 			{
 			
 				do{
+						
 						char readBuffSocket[100];
 						
 						bzero(readBuffSocket,100);
@@ -521,8 +550,8 @@ int main()
 		
 							if(token == NULL)
 									{	write(msgsock,"Connection terminated\n",strlen("Connection terminated\n"));
-										write(STDOUT_FILENO,"Connection terminated\n",strlen("Connection terminated\n"));
-										exit(EXIT_SUCCESS);
+										write(STDOUT_FILENO,"Exited\n",strlen("Exited\n"));
+										exit(EXIT_SUCCESS);//test
 									}
 							else write(msgsock,MESSAGE,strlen(MESSAGE));		
 						}
@@ -635,6 +664,20 @@ int main()
 
 }
 
+//thread 1
+void * acceptConnections(void * ptr)
+{
+	int * sock = (int *)malloc(sizeof(int));
+	
+	struct acceptConnectionsNode *acceptConnector;
+	
+	acceptConnector = (struct acceptConnectionsNode *) ptr;
+	
+	*sock = accept(acceptConnector->identifier,(struct sockaddr *)&acceptConnector->clientAddr, &acceptConnector->lengthClient);
+	
+	pthread_exit((void *)sock);//return something
+	
+}
 
 
 
