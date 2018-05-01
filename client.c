@@ -14,6 +14,8 @@
 #include<strings.h>
 #include<pthread.h>
 
+#define WELCOME "Welcome\n"
+
 void * readThread(void *ptr);
 
 void * writeThread(void *ptr);
@@ -34,36 +36,73 @@ int main(int argc, char * argv[])
 	
 	/*connect socket using name specified by the command line*/
 	server.sin_family = AF_INET;
-	hp = gethostbyname(argv[1]);
-	if( hp == 0)
+	
+	write(STDOUT_FILENO,WELCOME,strlen(WELCOME));//opening promopt
+	
+	write(STDOUT_FILENO,"type connect IP and Port\n",strlen("type connect IP and Port\n"));
+	
+	char openningBuff[100];
+	
+	int openningRead = read(STDIN_FILENO,openningBuff,100);
+	
+	openningBuff[openningRead - 1] = '\0';
+	
+	char * token = strtok(openningBuff," ");
+	
+		if(strcasecmp("connect",token) == 0)
 		{
+			int arguments = 0;
 			
-			exit(2);
-		}
-	bcopy(hp -> h_addr, &server.sin_addr, hp->h_length);
-	server.sin_port = htons(atoi(argv[2]));
-	
-	if(connect(sock, (struct sockaddr *) &server, sizeof(server)) < 0)	
-		{
-			perror("connect to stream socket");
-			exit(0);
-		}
-	/*create threads*/	
-	pthread_t thread1, thread2;
-	/*pthread_attr_t myattr;
-	pthread_attr_init(&myattr);
-	pthread_attr_setdetachstate(&myattr , PTHREAD_CREATE_DETACHED);*/
-	
-	int iret1 = pthread_create(&thread1, NULL,readThread,(void *)&sock);
-		
-	int iret2 = pthread_create(&thread2, NULL,writeThread,(void *)&sock);
-	
-	pthread_join(thread1,NULL);
-	pthread_join(thread2,NULL);
-	
-	
-	close(sock);
+			char *argumentsArray[2];
+			
+			token = strtok(NULL," ");
+			
+			while(token != NULL)
+			{
+				if(arguments > 1)
+					break;
+				
+				argumentsArray[arguments] = token;
 
+				arguments++;
+				
+				token = strtok(NULL," "); 
+			}
+			
+			if(arguments == 2)
+			
+				{	hp = gethostbyname(argumentsArray[0]);
+					if( hp == 0)
+						{
+			
+							exit(2);
+						}
+					bcopy(hp -> h_addr, &server.sin_addr, hp->h_length);
+					server.sin_port = htons(atoi(argumentsArray[1]));
+	
+					if(connect(sock, (struct sockaddr *) &server, sizeof(server)) < 0)	
+						{
+							perror("connect to stream socket");
+							exit(0);
+						}
+					/*create threads*/	
+					pthread_t thread1, thread2;
+					/*pthread_attr_t myattr;
+					pthread_attr_init(&myattr);
+					pthread_attr_setdetachstate(&myattr , PTHREAD_CREATE_DETACHED);*/
+	
+					int iret1 = pthread_create(&thread1, NULL,readThread,(void *)&sock);
+		
+					int iret2 = pthread_create(&thread2, NULL,writeThread,(void *)&sock);
+	
+					pthread_join(thread1,NULL);
+					pthread_join(thread2,NULL);
+	
+					close(sock);
+				}
+				else write(STDOUT_FILENO,"Invalid input\n",strlen("Invalid input\n"));			
+		}
+		else write(STDOUT_FILENO,"Invalid input\n",strlen("Invalid input\n"));
 }
 
 void * readThread(void *ptr)
@@ -108,6 +147,10 @@ void * writeThread(void *ptr)
 			readBuff[writeCount] = '\0';
 			
 			if(strcmp("Connection terminated\n",readBuff) == 0)
+				{
+					exit(EXIT_SUCCESS);
+				}
+			if(strcmp("Connection disconnected\n",readBuff) == 0)
 				{
 					exit(EXIT_SUCCESS);
 				}

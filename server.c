@@ -13,6 +13,7 @@
 #include<strings.h>
 #include<signal.h>
 #include<sys/ioctl.h>
+#include <arpa/inet.h>
 
 #define TRUE 1
 #define START "Welcome : Enter the commands to your liking\n"
@@ -51,13 +52,13 @@ static void signalHandler()
 	removeProcess(pid); //changing the status of the process to inactive...	
 	
 }
-void printIpAndPort(int portNumber)
+void printIpAndPort(int portNumber, char * ipAddress)
 {
 	int port = ntohs(portNumber);
 	
-	char tempBuff[50];
+	char tempBuff[100];
 	
-	int count = sprintf(tempBuff,"Port number = %d\n", port);
+	int count = sprintf(tempBuff,"Port number = %d and ip = %s\n", port,ipAddress);
 	
 	write(STDOUT_FILENO,tempBuff,count);
 
@@ -300,7 +301,10 @@ int main()
 			exit(1);
 		} 
 		
-	printIpAndPort(server.sin_port);
+	char str[INET_ADDRSTRLEN];
+	inet_ntop(AF_INET, (void *)&server.sin_addr.s_addr, str,INET_ADDRSTRLEN);
+	
+	printIpAndPort(server.sin_port,str);
 	
 	/* listening for connections*/
 	listen(sock, 5);
@@ -499,6 +503,15 @@ int main()
 		
 							if(token == NULL)
 								write(msgsock,HELP,strlen(HELP));
+									
+							else write(msgsock,MESSAGE,strlen(MESSAGE));		
+						}
+						else if(strcasecmp("disconnect",token) == 0)
+						{
+							token = strtok(NULL," \n");
+		
+							if(token == NULL)
+								write(msgsock,"Connection disconnected\n",strlen("Connection Disconnected\n"));
 									
 							else write(msgsock,MESSAGE,strlen(MESSAGE));		
 						}
