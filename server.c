@@ -15,7 +15,9 @@
 #include<sys/ioctl.h>
 #include<pthread.h>
 #include <arpa/inet.h>
+#include <poll.h>
 
+#define TIMEOUT 3
 #define TRUE 1
 #define START "Welcome : Enter the commands to your liking\n"
 #define DIVIDE "Error : division by zero\n"
@@ -25,6 +27,8 @@
 
 //thread1
 void * acceptConnections(void * ptr);
+
+void * serverRead(void *ptr);
 
 struct showIpAndPortNode{
 
@@ -38,6 +42,7 @@ struct ipAndPortArrayNode{
 	int connectionNo;
 	struct showIpAndPortNode ipAndPortArray[30];
 };
+struct ipAndPortArrayNode clientList;
 
 struct acceptConnectionsNode{
 	
@@ -333,9 +338,17 @@ int main()
 	/* listening for connections*/
 	listen(sock, 5);
 	
+	pthread_t readThread;
+	pthread_attr_t myattr;
+	pthread_attr_init(&myattr);
+	pthread_attr_setdetachstate(&myattr , PTHREAD_CREATE_DETACHED);
+	//user control of server
+	int iret2 = pthread_create(&readThread, &myattr ,serverRead,NULL);
+	
+	
 	do{
-		pthread_t connectThread;
 		
+		pthread_t connectThread;
 		int clientLength = sizeof(client);
 		
 		//connector Node setting which will be passed to connectThread
@@ -345,7 +358,6 @@ int main()
 		connector.lengthClient = clientLength;
 		
 		int iret1 = pthread_create(&connectThread, NULL ,acceptConnections,(void *)&connector);
-		
 		//waiting for the thread
 		void *readMessage;
 		
@@ -363,7 +375,6 @@ int main()
 			{
 			
 				do{
-						
 						char readBuffSocket[100];
 						
 						bzero(readBuffSocket,100);
@@ -687,28 +698,96 @@ void * acceptConnections(void * ptr)
 	
 	struct showIpAndPortNode ipAndPortStorage;
 	
-	struct ipAndPortArrayNode ipAndPortStoreArray;
-	
 	acceptConnector = (struct acceptConnectionsNode *) ptr;
 	
 	int returnValue = accept(acceptConnector->identifier,(struct sockaddr *)&acceptConnector->clientAddr, &acceptConnector->lengthClient);
-		
+	
+	if(returnValue == -1)
+		{	
+			pthread_exit(NULL);
+		}	
 	*sock = returnValue;
 	
 	char str[INET_ADDRSTRLEN];
+	
+	bzero(str,INET_ADDRSTRLEN);
 
 	inet_ntop(AF_INET, (void *)&acceptConnector->clientAddr.sin_addr.s_addr, str,INET_ADDRSTRLEN);
 
-	ipAndPortStoreArray.ipAndPortArray[ipAndPortStoreArray.connectionNo].portNo = ntohs(acceptConnector->clientAddr.sin_port);
+	clientList.ipAndPortArray[clientList.connectionNo].portNo = ntohs(acceptConnector->clientAddr.sin_port);
 
-	strcpy(ipAndPortStoreArray.ipAndPortArray[ipAndPortStoreArray.connectionNo].ipAddress,str);
-
-	ipAndPortStoreArray.connectionNo++;
+	strcpy(clientList.ipAndPortArray[clientList.connectionNo].ipAddress,str);
+	
+	clientList.connectionNo++;
 	
 	pthread_exit((void *)sock);//return struct
 	
 }
 
+void * serverRead(void *ptr)
+{
+			while(TRUE)
+			{
+						write(STDOUT_FILENO, "Welcome to the server setup:: develop by saad486\n",strlen("welcome to the server setup:: develop by saad486\n"));
+						char readFromServer[100];
+	
+						int readCount = read(STDIN_FILENO,readFromServer,100);
+	
+						if(readFromServer[0] == '\n')
+								{
+									write(STDOUT_FILENO,"Invalid command\n",strlen("Invalid Command\n"));
+									//pthread_exit(NULL);
+								}	
+		
+						else{
+								
+								readFromServer[readCount - 1] = '\0';
+								
+								readCount -= 1;
+								
+								char * token = strtok(readFromServer," ");
+								
+																	//write(STDOUT_FILENO,"Saad\n",5);
+			
+								if(strcasecmp("list",token) == 0)
+								{									
+									if((token = strtok(NULL," ")) == NULL)
+										{
+											write(STDOUT_FILENO,"Invalid command\n",strlen("Invalid Command\n"));
+											//pthread_exit(NULL);
+										}
+									else if(strcasecmp(token,"connections") == 0)
+										{
+											if(clientList.connectionNo == 0 )
+												{
+													write(STDOUT_FILENO,"No clients connected\n",strlen("No clients connected\n"));
+													//pthread_exit(NULL);
+												}
+											else {
+													char readListBuff[1000];
+													int noOfClients = 0;
+
+								
+													for(int i = 0; i<clientList.connectionNo;i++)
+														{
+															noOfClients += sprintf(&readListBuff[noOfClients],"Ip = %s and port = %d\n",clientList.ipAndPortArray[i].ipAddress,clientList.ipAndPortArray[i].portNo);
+														}
+													write(STDOUT_FILENO, readListBuff, noOfClients);
+												}
+							
+										}
+								}
+								else{
+									write(STDOUT_FILENO,"Invalid command\n",strlen("Invalid Command\n"));
+									//pthread_exit(NULL);
+								}			
+			
+		
+						}
+
+
+			}
+}
 
 
 
