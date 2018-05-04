@@ -28,13 +28,15 @@
 //thread1
 void * acceptConnections(void * ptr);
 
+void removePipeDescriptors(int pid);
+
 void setPortNo(int port);
 
 int getPortNo();
 
-int getIndexClient(int port);
+int getIndexClient(int pid);
 
-void removeProcessClient(int port);
+void removeProcessClient(int pid);
 
 void * serverRead(void *ptr);
 
@@ -51,7 +53,8 @@ struct serverParentChildNode{
 
 };
 struct showIpAndPortNode{
-
+	
+	int pid;
 	int socket;
 	int readID;
 	int writeID;
@@ -88,7 +91,7 @@ void printActiveProcessArray(int fd);
 //making process appear in active in list
 void removeProcess(int processID);
 
-void printClientProcess(struct showIpAndPortNode * pipeVariable);
+void printClientProcess(struct showIpAndPortNode * pipeInput);
 //Node array 
 struct Node * processArray[30];//if typed exit then it will be freed
 int processCounter = 0;
@@ -107,23 +110,12 @@ static void signalHandler()
 	
 }
 
-static int portNumber;
-
-void setPortNo(int port)
-{
-	portNumber = port;
-}
-
-int getPortNo()
-{
-	return portNumber;
-}
-
-//SIGUSR1
 static void signalHandlerClient()
 {
-		removeProcessClient(getPortNo());
-	
+		int pid = wait(NULL);
+		removePipeDescriptors(pid);
+		removeProcessClient(pid);
+		
 }
 
 void printIpAndPort(int portNumber, char * ipAddress)
@@ -330,6 +322,7 @@ void removeProcess(int pid)
 		}		
 	}
 }
+struct serverParentChildNode pipeVariable;
 //#######Server###############
 int main()
 {
@@ -338,22 +331,10 @@ int main()
 	int writeCountSocket = 0;
 	int readCountSocket = 1;
 	char * runArray[20];
-	struct serverParentChildNode pipeVariable;
 	pipeVariable.count = 0;
 	int moreThanOneThreads = 0;
 	
-	//pipe array between parent server and client
-	int readEndPipe[10];
-	int writeEndPipe[10];
-	
-	
-	/*Implementing SIGCHLD handling in signalhandler*/
-	if(signal(SIGCHLD, signalHandler) == SIG_ERR)
-		{
-			perror("error binding handling SIGCHLD"); 
-		}
-
-	if(signal(SIGUSR1, signalHandlerClient) == SIG_ERR)
+	if(signal(SIGCHLD, signalHandlerClient) == SIG_ERR)
 		{
 			perror("error binding handling SIGCHLD"); 
 		}
@@ -423,6 +404,8 @@ int main()
 		clientList.ipAndPortArray[clientList.connectionNo] = clientInformation;
 		clientList.connectionNo++;
 		
+		//setPortNo(clientInformation->portNo );//set port number is set method 
+		
 		int pipeDescriptors[2];
 		int pipeDescriptorsOne[2];
 		
@@ -433,13 +416,18 @@ int main()
 		pipeVariable.writeEnd[pipeVariable.count] = pipeDescriptors[1];
 				
 		pipeVariable.readEnd[pipeVariable.count] = pipeDescriptorsOne[0];
+		
+		clientInformation->readID = pipeDescriptors[0];
+				clientInformation->writeID = pipeDescriptorsOne[1];
+
+		
 		pipeVariable.count++;		
 		
 		int iret2;
 		
 		if(moreThanOneThreads == 0)
 		 	{	
-		 		iret2 = pthread_create(&readThread, &myattr ,serverRead,(void *)&pipeVariable);
+		 		iret2 = pthread_create(&readThread, &myattr ,serverRead,NULL);
 				moreThanOneThreads = 1;
 			}
 		int serverChild = fork();
@@ -450,10 +438,15 @@ int main()
 		
 				close(pipeDescriptorsOne[0]);
 				
-				clientInformation->readID = pipeDescriptors[0];
-				clientInformation->writeID = pipeDescriptorsOne[1];
-						
+				
+				
 				pthread_t serverChildThread;
+				
+				/*Implementing SIGCHLD handling in signalhandler*/
+				if(signal(SIGCHLD, signalHandler) == SIG_ERR)
+				{
+				perror("error binding handling SIGCHLD"); 
+				}
 						
 				int iret3 = pthread_create(&serverChildThread, &myattr ,serverChildRead,(void *)clientInformation);
 				
@@ -493,7 +486,6 @@ int main()
 						if(readCountSocket == 0)
 						 		{
 						 			write(STDOUT_FILENO, "Connection ended\n",strlen("Connection ended\n"));
-						 			kill(getppid(),SIGUSR1);
 						 			kill(getpid(),SIGTERM);
 						 		}
 					
@@ -764,10 +756,8 @@ int main()
 		
 		else if(serverChild > 0)
 		{
-			/*int status;
-			
-			int pid = waitpid(serverChild, &status, WNOHANG);*/
-			//read and write end of no functionality closed
+		clientInformation->pid = serverChild;
+		
 		close(pipeDescriptors[0]);
 		
 		close(pipeDescriptorsOne[1]);
@@ -806,8 +796,10 @@ void * acceptConnections(void * ptr)
 	clientInformation->socket = returnValue;
 	
 	clientInformation->portNo = ntohs(acceptConnector->clientAddr.sin_port);
-
+	
 	strcpy(clientInformation->ipAddress,str);
+	
+	write(clientInformation->socket,"Welcome to the server developed by saad486::\n",strlen("Welcome to the server developed by saad486::\n"));
 	
 	pthread_exit((void *)clientInformation);//return struct
 	}
@@ -817,8 +809,6 @@ void * serverRead(void *ptr)
 {
 	while(1)
 		{	
-			struct serverParentChildNode * pipeVariable = (struct serverParentChildNode *)ptr;
-	
 			char readBuff[100];
 	
 			write(STDOUT_FILENO,"Enter the command:\n",strlen("Enter the command:\n"));
@@ -842,9 +832,9 @@ void * serverRead(void *ptr)
 					
 					else if(strcasecmp(token,"processes") == 0)
 						{
-							for(int i = 0; i < pipeVariable->count;i++)
-								{	write(pipeVariable->writeEnd[i],"Give Processes\n",strlen("Give Processes\n"));	
-									count = read(pipeVariable->readEnd[i],result,1000);
+							for(int i = 0; i < pipeVariable.count;i++)
+								{	write(pipeVariable.writeEnd[i],"Give Processes\n",strlen("Give Processes\n"));	
+									count = read(pipeVariable.readEnd[i],result,1000);
 									write(STDOUT_FILENO,result,count);
 								}	
 						}
@@ -864,13 +854,13 @@ void * serverChildRead(void *ptr)
 {
 	while(1)
 	{	
-		struct showIpAndPortNode * pipeVariable = (struct showIpAndPortNode *)ptr;
+		struct showIpAndPortNode * pipeInput = (struct showIpAndPortNode *)ptr;
 	
 		char buff[100];
 	
-		int count = read(pipeVariable->readID, buff, 100);
+		int count = read(pipeInput->readID, buff, 100);
 	
-		printClientProcess(pipeVariable);  
+		printClientProcess(pipeInput);  
 	}
 
 }
@@ -888,7 +878,7 @@ void printClients()
 	write(STDOUT_FILENO, readListBuff, noOfClients);
 }
 
-void printClientProcess(struct showIpAndPortNode * pipeVariable)
+void printClientProcess(struct showIpAndPortNode * pipeInput)
 {
 	int i = 0;
 	
@@ -896,7 +886,7 @@ void printClientProcess(struct showIpAndPortNode * pipeVariable)
 	
 	int count = 0;
 	
-	count = sprintf(&buff[count],"IP = %s and Port no = %d\n",pipeVariable->ipAddress,pipeVariable->portNo);
+	count = sprintf(&buff[count],"IP = %s and Port no = %d\n",pipeInput->ipAddress,pipeInput->portNo);
 	
 	if(processCounter == 0 )
 		{
@@ -908,16 +898,16 @@ void printClientProcess(struct showIpAndPortNode * pipeVariable)
 				count += sprintf(&buff[count],"Process ID = %d, Active = %d, Process name = %s\n", processArray[i]-> id,processArray[i]->active,processArray[i]->name);
 			}
 		}
-		write(pipeVariable->writeID,buff,count);
+		write(pipeInput->writeID,buff,count);
 }
 
-int getIndexClient(int port)
+int getIndexClient(int pid)
 {
 	int returnIndex;
 	
 	for(int i = 0; i<clientList.connectionNo; i++)
 		{
-			if(clientList.ipAndPortArray[i]->portNo == port)
+			if(clientList.ipAndPortArray[i]->pid == pid)
 				{
 					returnIndex = i;
 					break;
@@ -926,21 +916,66 @@ int getIndexClient(int port)
 	return returnIndex;
 }
 
-void removeProcessClient(int port)
+void removeProcessClient(int pid)
 {
-	int index = getIndexClient(port);
+	int index = getIndexClient(pid);
 	
-	if(clientList.connectionNo == 1)
-		clientList.connectionNo -= 1;
-	 	
-	else if(index == clientList.connectionNo - 1)
-		clientList.connectionNo -= 1;
-	else{
-		
+	free(clientList.ipAndPortArray[index]);
 	
-		 
-		
+	/*int pid;
+	int socket;
+	int readID;
+	int writeID;
+	int portNo;*/
+	
+	int pos;
+	
+	
+	for(pos = index+1;pos<clientList.connectionNo;pos++)
+	{
+		int i = pos - 1;
+		clientList.ipAndPortArray[i] = clientList.ipAndPortArray[pos];
 	}
+	clientList.connectionNo--;
+	
+	for(int i = 0;i<clientList.connectionNo;i++)
+		{
+			printf("port %d read %d write %d\n",clientList.ipAndPortArray[i]->portNo,clientList.ipAndPortArray[i]->readID,clientList.ipAndPortArray[i]->writeID);
+		}
 }
 
-
+void removePipeDescriptors(int pid)
+{
+	int pos = 0;
+	
+	for(; pos<clientList.connectionNo; pos++)
+		{
+			if(clientList.ipAndPortArray[pos]->pid == pid)
+				break;
+		}
+		
+	int readID = clientList.ipAndPortArray[pos]->readID;
+	int writeID = clientList.ipAndPortArray[pos]->writeID;    
+	
+	for(pos = 0;pos<pipeVariable.count; pos++)				
+	{
+		
+		if(pipeVariable.readEnd[pos] == readID)
+			break;
+	}
+	
+	for(int i = pos+1; i<pipeVariable.count;i++)
+	{
+		int j = i - 1;
+		pipeVariable.readEnd[j] = pipeVariable.readEnd[i];
+		pipeVariable.writeEnd[j] = pipeVariable.writeEnd[i];		
+	}
+	pipeVariable.count--;
+	
+	for(int i =0 ;i<pipeVariable.count;i++)
+		{
+			printf("read %d\n",pipeVariable.readEnd[i]);
+			printf("write %d\n",pipeVariable.writeEnd[i]);
+		}	
+	
+}
