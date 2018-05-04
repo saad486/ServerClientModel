@@ -38,25 +38,23 @@ void removeProcessClient(int port);
 
 void * serverRead(void *ptr);
 
-void printClientProcess(int fd);
+void printClients();
 
 void * serverChildRead(void *ptr);
-//server child thread
-struct serverChildPipeNode{
-		int readID;
-		int writeID;
-};
 //pipes array
 struct serverParentChildNode{
 	
 	int writeEnd[10];
 	int readEnd[10];
 	
-	int writeCount;
-	int readCount;
+	int count;
+
 };
 struct showIpAndPortNode{
 
+	int socket;
+	int readID;
+	int writeID;
 	int portNo;
 	char ipAddress[INET_ADDRSTRLEN];
 	
@@ -65,7 +63,7 @@ struct showIpAndPortNode{
 struct ipAndPortArrayNode{
 	
 	int connectionNo;
-	struct showIpAndPortNode ipAndPortArray[30];
+	struct showIpAndPortNode *ipAndPortArray[30];
 };
 struct ipAndPortArrayNode clientList;
 
@@ -90,6 +88,7 @@ void printActiveProcessArray(int fd);
 //making process appear in active in list
 void removeProcess(int processID);
 
+void printClientProcess(struct showIpAndPortNode * pipeVariable);
 //Node array 
 struct Node * processArray[30];//if typed exit then it will be freed
 int processCounter = 0;
@@ -340,8 +339,7 @@ int main()
 	int readCountSocket = 1;
 	char * runArray[20];
 	struct serverParentChildNode pipeVariable;
-	pipeVariable.writeCount = 0;
-	pipeVariable.readCount = 0;
+	pipeVariable.count = 0;
 	int moreThanOneThreads = 0;
 	
 	//pipe array between parent server and client
@@ -409,6 +407,8 @@ int main()
 		connector.identifier = sock;
 		connector.clientAddr = client;
 		connector.lengthClient = clientLength;
+		struct showIpAndPortNode *clientInformation;
+		
 		
 		int iret1 = pthread_create(&connectThread, NULL ,acceptConnections,(void *)&connector);
 		//waiting for the thread
@@ -416,12 +416,12 @@ int main()
 		
 		pthread_join(connectThread, &readMessage);
 		
-		
-		int * returnMessage = (int *)readMessage;
+		clientInformation = (struct showIpAndPortNode *)readMessage;
 	
-		int msgsock =  *returnMessage;
+		int msgsock =  clientInformation->socket;
 		
-		free(returnMessage);
+		clientList.ipAndPortArray[clientList.connectionNo] = clientInformation;
+		clientList.connectionNo++;
 		
 		int pipeDescriptors[2];
 		int pipeDescriptorsOne[2];
@@ -430,11 +430,10 @@ int main()
 		
 		pipe(pipeDescriptorsOne);
 		
-		pipeVariable.writeEnd[pipeVariable.writeCount] = pipeDescriptors[1];
-		pipeVariable.writeCount++;		
-		
-		pipeVariable.readEnd[pipeVariable.readCount] = pipeDescriptorsOne[0];
-		pipeVariable.readCount++;		
+		pipeVariable.writeEnd[pipeVariable.count] = pipeDescriptors[1];
+				
+		pipeVariable.readEnd[pipeVariable.count] = pipeDescriptorsOne[0];
+		pipeVariable.count++;		
 		
 		int iret2;
 		
@@ -451,15 +450,12 @@ int main()
 		
 				close(pipeDescriptorsOne[0]);
 				
-				//client and child server communication###########
-						struct serverChildPipeNode threadPipe;
+				clientInformation->readID = pipeDescriptors[0];
+				clientInformation->writeID = pipeDescriptorsOne[1];
 						
-						threadPipe.readID = pipeDescriptors[0];
-						threadPipe.writeID = pipeDescriptorsOne[1];
+				pthread_t serverChildThread;
 						
-						pthread_t serverChildThread;
-						
-						int iret3 = pthread_create(&serverChildThread, &myattr ,serverChildRead,(void *)&threadPipe);
+				int iret3 = pthread_create(&serverChildThread, &myattr ,serverChildRead,(void *)clientInformation);
 				
 				do{
 						char readBuffSocket[100];
@@ -785,11 +781,11 @@ int main()
 //thread 1
 void * acceptConnections(void * ptr)
 {
-	int * sock = (int *)malloc(sizeof(int));
+	int * sock = (int *)ptr;
 	
 	struct acceptConnectionsNode *acceptConnector;
 	
-	struct showIpAndPortNode ipAndPortStorage;
+	struct showIpAndPortNode *clientInformation = (struct showIpAndPortNode*)malloc(sizeof(struct showIpAndPortNode));
 	
 	//struct returnFromAccept *returnPortAndSocket = (struct returnFromAccept *)malloc(sizeof(struct returnFromAccept));
 	
@@ -807,26 +803,25 @@ void * acceptConnections(void * ptr)
 	
 	inet_ntop(AF_INET, (void *)&acceptConnector->clientAddr.sin_addr.s_addr, str,INET_ADDRSTRLEN);
 
-	clientList.ipAndPortArray[clientList.connectionNo].portNo = ntohs(acceptConnector->clientAddr.sin_port);
+	clientInformation->socket = returnValue;
+	
+	clientInformation->portNo = ntohs(acceptConnector->clientAddr.sin_port);
 
-	strcpy(clientList.ipAndPortArray[clientList.connectionNo].ipAddress,str);
+	strcpy(clientInformation->ipAddress,str);
 	
-	setPortNo(clientList.ipAndPortArray[clientList.connectionNo].portNo);
-	
-	clientList.connectionNo++;
-	
-	pthread_exit((void *)sock);//return struct
+	pthread_exit((void *)clientInformation);//return struct
 	}
 }
 
 void * serverRead(void *ptr)
 {
 	while(1)
-		{	struct serverParentChildNode * pipeVariable = (struct serverParentChildNode *)ptr;
+		{	
+			struct serverParentChildNode * pipeVariable = (struct serverParentChildNode *)ptr;
 	
 			char readBuff[100];
 	
-			write(STDOUT_FILENO,"Welcome\n",strlen("Welcome\n"));
+			write(STDOUT_FILENO,"Enter the command:\n",strlen("Enter the command:\n"));
 	
 			int readCount = read(STDIN_FILENO,readBuff,100);
 	
@@ -838,46 +833,82 @@ void * serverRead(void *ptr)
 	
 			if(strcasecmp(token,"list") == 0)
 				{
-					for(int i = 0; i < pipeVariable->readCount;i++)
-							{	write(pipeVariable->writeEnd[i],"Give Processes\n",strlen("Give Processes\n"));	
-								count = read(pipeVariable->readEnd[i],result,1000);
-								write(STDOUT_FILENO,result,count);
-							}	
+					token = strtok(NULL," \n");
+					
+					if(token == NULL)
+						{
+							write(STDOUT_FILENO,"Invalid command\n",strlen("Invalid command\n"));
+						} 
+					
+					else if(strcasecmp(token,"processes") == 0)
+						{
+							for(int i = 0; i < pipeVariable->count;i++)
+								{	write(pipeVariable->writeEnd[i],"Give Processes\n",strlen("Give Processes\n"));	
+									count = read(pipeVariable->readEnd[i],result,1000);
+									write(STDOUT_FILENO,result,count);
+								}	
+						}
+					else if(strcasecmp(token,"clients") == 0)
+					{
+						printClients();
+					}
+					else write(STDOUT_FILENO,"Invalid command\n",strlen("Invalid command\n"));
 					
 				}
+				else write(STDOUT_FILENO,"Invalid command\n",strlen("Invalid command\n"));
 
-			}
+		}
 }
 
 void * serverChildRead(void *ptr)
 {
 	while(1)
 	{	
-		struct serverChildPipeNode * pipeVariable = (struct serverChildPipeNode *)ptr;
+		struct showIpAndPortNode * pipeVariable = (struct showIpAndPortNode *)ptr;
 	
 		char buff[100];
 	
 		int count = read(pipeVariable->readID, buff, 100);
 	
-		printClientProcess(pipeVariable->writeID);  
+		printClientProcess(pipeVariable);  
 	}
 
 }
-void printClientProcess(int fd)
+void printClients()
 {
-int i = 0;
+	char readListBuff[1000];
+	int noOfClients = 0;
+
+								
+	for(int i = 0; i<clientList.connectionNo;i++)
+	{
+		noOfClients += sprintf(&readListBuff[noOfClients],"Ip = %s and port = %d\n",clientList.ipAndPortArray[i]->ipAddress,clientList.ipAndPortArray[i]->portNo);
+	}
+	
+	write(STDOUT_FILENO, readListBuff, noOfClients);
+}
+
+void printClientProcess(struct showIpAndPortNode * pipeVariable)
+{
+	int i = 0;
 	
 	char buff[2000];
 	
 	int count = 0;
 	
-	for(;i<processCounter;i++)
-		{
-			count += sprintf(&buff[count],"Process ID = %d , Active = %d, Process name = %s\n",processArray[i]-> id,processArray[i]->active,processArray[i]->name);
-		}
+	count = sprintf(&buff[count],"IP = %s and Port no = %d\n",pipeVariable->ipAddress,pipeVariable->portNo);
 	
-		write(fd,buff,count);
-
+	if(processCounter == 0 )
+		{
+			count += sprintf(&buff[count],"No processes listed\n");
+		}
+	else{
+		for(;i<processCounter;i++)
+			{
+				count += sprintf(&buff[count],"Process ID = %d, Active = %d, Process name = %s\n", processArray[i]-> id,processArray[i]->active,processArray[i]->name);
+			}
+		}
+		write(pipeVariable->writeID,buff,count);
 }
 
 int getIndexClient(int port)
@@ -886,7 +917,7 @@ int getIndexClient(int port)
 	
 	for(int i = 0; i<clientList.connectionNo; i++)
 		{
-			if(clientList.ipAndPortArray[i].portNo == port)
+			if(clientList.ipAndPortArray[i]->portNo == port)
 				{
 					returnIndex = i;
 					break;
@@ -906,17 +937,9 @@ void removeProcessClient(int port)
 		clientList.connectionNo -= 1;
 	else{
 		
-		struct showIpAndPortNode temp;
-		temp.portNo = clientList.ipAndPortArray[clientList.connectionNo -1].portNo;
-		strcpy(temp.ipAddress, clientList.ipAndPortArray[clientList.connectionNo -1].ipAddress);
-		
-		clientList.ipAndPortArray[clientList.connectionNo -1].portNo = clientList.ipAndPortArray[index].portNo;
-		strcpy(clientList.ipAndPortArray[clientList.connectionNo -1].ipAddress, clientList.ipAndPortArray[index].ipAddress);
-		
-		clientList.ipAndPortArray[index].portNo = temp.portNo;
-		strcpy(clientList.ipAndPortArray[index].ipAddress, temp.ipAddress);
+	
 		 
-		clientList.connectionNo -= 1;
+		
 	}
 }
 
