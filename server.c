@@ -42,6 +42,7 @@ void * serverRead(void *ptr);
 
 void printClients();
 
+
 void * serverChildRead(void *ptr);
 //pipes array
 
@@ -85,6 +86,8 @@ void printActiveProcessArray(int fd);
 
 //making process appear in active in list
 void removeProcess(int processID);
+
+void printProcessIp(struct showIpAndPortNode * pipeInput);
 
 void printClientProcess(struct showIpAndPortNode * pipeInput);
 //Node array 
@@ -641,7 +644,6 @@ int main()
 					
 												if(check == 0)
 													{
-														write(STDOUT_FILENO,"saad\n",5);
 														killProcessByName(stoken, msgsock);
 												
 													}
@@ -718,7 +720,7 @@ int main()
 									 		
 									if(serverPid == 0)
 									{	
-										//write(sd[1],"saad",4);
+										
 										int count = execvp(runArray[0],&runArray[1]);
 										
 											if(count == -1)
@@ -844,6 +846,8 @@ void * serverRead(void *ptr)
 	while(1)
 		{	
 			char readBuff[100];
+			
+			bzero(readBuff,100);
 	
 			write(STDOUT_FILENO,"Enter the command:\n",strlen("Enter the command:\n"));
 	
@@ -869,9 +873,24 @@ void * serverRead(void *ptr)
 					
 					else if(strcasecmp(token,"processes") == 0)
 						{
+							
 							if(clientList.connectionNo == 0)
 									write(STDOUT_FILENO,"No clients processes listed\n",strlen("No clients processes listed\n"));
+									
+							else if((token = strtok(NULL," \n")) != NULL)
+							{
 							
+								if(strcasecmp(token,"IP") == 0)
+									{	
+										 for(int i = 0; i < clientList.connectionNo;i++)
+											{	int readCount = write(clientList.ipAndPortArray[i]->writeServerId,"Give IP\n",strlen("Give IP\n"));
+									
+													count = read(clientList.ipAndPortArray[i]->readServerId,result,1000);
+														write(STDOUT_FILENO,result,count);
+											}			
+										}	
+									else write(STDOUT_FILENO,"Invalid command\n",strlen("Invalid command\n"));
+							}
 							else{
 									for(int i = 0; i < clientList.connectionNo;i++)
 										{	int readCount = write(clientList.ipAndPortArray[i]->writeServerId,"Give Processes\n",strlen("Give Processes\n"));
@@ -889,7 +908,7 @@ void * serverRead(void *ptr)
 					
 				}
 				else write(STDOUT_FILENO,"Invalid command\n",strlen("Invalid command\n"));
-
+				
 		}
 }
 
@@ -902,8 +921,14 @@ void * serverChildRead(void *ptr)
 		char buff[100];
 	
 		int count = read(pipeInput->readServerChildId, buff, 100);
-	
-		printClientProcess(pipeInput);  
+		
+		buff[count - 1] = '\0';
+		
+		if(strcmp(buff,"Give Processes") == 0)
+			printClientProcess(pipeInput);
+		
+		else if (strcmp(buff,"Give IP")==0)
+			printProcessIp(pipeInput);
 	}
 
 }
@@ -925,6 +950,27 @@ void printClients()
 		write(STDOUT_FILENO, readListBuff, noOfClients);
 	}	
 }
+
+void printProcessIp(struct showIpAndPortNode * pipeInput)
+{
+	int i = 0;
+	
+	char buff[2000];
+	
+	int count = 0;
+	
+	if(processCounter == 0 )
+		{
+			count += sprintf(&buff[count],"No processes listed\n");
+		}
+	else{
+		for(;i<processCounter;i++)
+			{
+				count += sprintf(&buff[count],"IP address = %s : Process ID = %d,Process name = %s\n",pipeInput->ipAddress, processArray[i]-> id,processArray[i]->name);
+			}
+		}
+		write(pipeInput->writeServerChildId,buff,count);
+} 
 
 void printClientProcess(struct showIpAndPortNode * pipeInput)
 {
