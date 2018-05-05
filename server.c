@@ -123,10 +123,54 @@ void printIpAndPort(int portNumber, char * ipAddress)
 	write(STDOUT_FILENO,tempBuff,count);
 
 }
-
+void killProcessByName(char * token, int fd)
+{
+	if(strcasecmp(token,"all") == 0)
+	{
+		int activePCount;	
+		
+		for(int i = 0;i<processCounter;i++)
+		{
+			if(processArray[i]->active == 1)
+				{
+					activePCount++;
+					int c = kill(processArray[i]->id,SIGTERM);
+						if(c == -1)
+						perror("error");
+				}			
+		}	
+		if(activePCount == 0)
+			write(fd,"No active process to terminate\n",strlen("No active process to terminate\n"));	
+		else write(fd,"All active processes terminated\n",strlen("All active processes terminated\n"));	
+		
+	}
+	else{
+			int returnID;
+			
+			for(int i = 0; i<processCounter; i++)
+			{
+				if(strcmp(processArray[i]->name, token) == 0)
+						{	
+							returnID = i;
+							break;
+						}
+			}
+		
+			int c = kill(processArray[returnID]->id,SIGTERM);
+		
+			if(c == 0 && returnID != 0)
+			{
+				char buff[100];
+		
+				int count = sprintf(buff,"Prcocess %s, pid %d terminated\n",processArray[returnID]->name,processArray[returnID]->id);
+		
+				write(fd,buff,count);
+			}
+			else write(fd,"Process has already terminated or is not in the list\n",strlen("Process has already terminated or is not in the list\n"));
+		}	
+}
 char* methodArithmetic(char * token, char * buff)
 {
-	
 	char * identifier = token;
 	
 	int sum = 0;
@@ -145,8 +189,6 @@ char* methodArithmetic(char * token, char * buff)
 			
 			return buff;
 		}
-	
-	
 	
 	while(token != NULL)
 	{
@@ -218,7 +260,7 @@ char* methodArithmetic(char * token, char * buff)
 			strcpy(buff,"Too few arguments! Atleast two required\n");
 			
 	else
-		 	{	int count = sprintf(buff,"%d",sum);
+		 	{	int count = sprintf(buff,"result of %s : %d",identifier,sum);
 
 		 		buff[count] = '\n';
 
@@ -473,7 +515,7 @@ int main()
 						if(readCountSocket == 0)
 						 		{
 						 			write(STDOUT_FILENO, "Connection ended\n",strlen("Connection ended\n"));
-						 			kill(SIGTERM,getpid());
+						 			exit(EXIT_SUCCESS);
 						 		}
 					
 						char * token;
@@ -576,43 +618,48 @@ int main()
 						}
 						else if(strcasecmp("kill",token) == 0)
 						{
-							token = strtok(NULL," \n");
+							if(processCounter > 0)
+								{	token = strtok(NULL," \n");
 		
-							if(token==NULL)
-							{
-								write(msgsock,"Invalid command\n",strlen("Invalid command\n"));
-							}
-							else {
-									char * stoken = token;
-				
-									token = strtok(NULL," \n");
-				
-									if(token == NULL)
+									if(token==NULL)
 									{
-										int pid = 0;
-											
-										int kcount = sscanf(stoken,"%d",&pid);
-					
-										int check = checkDigit(stoken);
-					
-										if(check == 0)
-											{
-												write(msgsock,"Invalid arguments\n",strlen("Invalid arguments\n"));
-											}
-					
-										else {
-												kcount = kill(pid,SIGTERM);
+										write(msgsock,"Invalid command\n",strlen("Invalid command\n"));
+									}
+									else {
 							
-												if(kcount == -1)
-													write(msgsock,"Invalid process ID\n",strlen("Invalid process ID\n"));
-															
-												else write(msgsock,"Process Terminated\n",strlen("Process Terminated\n"));
+											char * stoken = token;
+				
+											token = strtok(NULL," \n");
+				
+											if(token == NULL)
+											{
+												int pid = 0;
+											
+												int kcount = sscanf(stoken,"%d",&pid);
 					
-												}
-											}
-										else write(msgsock,"Invalid arguments\n",strlen("Invalid arguments\n"));	
-								}
-	
+												int check = checkDigit(stoken);
+					
+												if(check == 0)
+													{
+														write(STDOUT_FILENO,"saad\n",5);
+														killProcessByName(stoken, msgsock);
+												
+													}
+					
+												else {
+														kcount = kill(pid,SIGTERM);
+							
+														if(kcount == -1)
+															write(msgsock,"Invalid process ID\n",strlen("Invalid process ID\n"));
+															
+														else write(msgsock,"Process Terminated\n",strlen("Process Terminated\n"));
+					
+														}
+													}
+												else write(msgsock,"Invalid arguments\n",strlen("Invalid arguments\n"));	
+										}
+									}
+									else write(msgsock,"No processes listed\n",strlen("No processes listed\n"));
 						}
 						else if(strcasecmp("help",token) == 0)
 						{
