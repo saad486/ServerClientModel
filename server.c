@@ -16,8 +16,8 @@
 #include<pthread.h>
 #include <arpa/inet.h>
 #include <poll.h>
+#include<time.h>
 
-#define TIMEOUT 5
 #define TRUE 1
 #define START "Welcome : Enter the commands to your liking\n"
 #define DIVIDE "Error : division by zero\n"
@@ -42,6 +42,7 @@ void * serverRead(void *ptr);
 
 void printClients();
 
+void saveEndTime(int pid, int end);
 
 void * serverChildRead(void *ptr);
 //pipes array
@@ -77,6 +78,8 @@ struct acceptConnectionsNode{
 struct Node{
 	int id;
 	int active;
+	int start;
+	int end;
 	char name[15];	
 };
 //process arrays
@@ -104,9 +107,12 @@ static void signalHandler()
 	
 	int pid = wait(NULL);
 	
+	int timeNoted = (int)time(NULL);
+	saveEndTime(pid,timeNoted);
 	removeProcess(pid); //changing the status of the process to inactive...	
 	
 }
+
 
 static void signalHandlerClient()
 {
@@ -301,6 +307,18 @@ int checkDigit(char * token)
 	else return 1;
 }
 
+void saveEndTime(int pid, int end)
+{
+	for(int i = 0;i<processCounter;i++)
+		{
+			if(processArray[i]->id == pid)
+				{
+					processArray[i]->end = end;
+					break;
+				}
+		}
+		
+}
 void printArray(int fd)
 {	
 	int i = 0;
@@ -311,7 +329,7 @@ void printArray(int fd)
 	
 	for(;i<processCounter;i++)
 		{
-			count += sprintf(&buff[count],"Process ID = %d , Active = %d, Process name = %s\n",processArray[i]-> id,processArray[i]->active,processArray[i]->name);
+			count += sprintf(&buff[count],"Process ID = %d , Active = %d, Process name = %s\n, start time = %d, End time = %d Elapsed time  = %d\n",processArray[i]-> id,processArray[i]->active,processArray[i]->name,processArray[i]->start,processArray[i]->end,(int)time(NULL) - processArray[i]->start);
 		}
 	
 		write(fd,buff,count);
@@ -756,6 +774,8 @@ int main()
 												processArray[processCounter] -> id = serverPid;
 												strcpy(processArray[processCounter] -> name, runArray[0]);
 												processArray[processCounter] -> active = 1;
+												processArray[processCounter] -> start = (int)time(NULL);
+												processArray[processCounter] -> end = -1;
 												processCounter++;
 										  		write(msgsock,"Executing...\n",strlen("Executing...\n"));
 										  		
