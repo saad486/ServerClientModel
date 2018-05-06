@@ -327,9 +327,11 @@ void printArray(int fd)
 	
 	int count = 0;
 	
+	count += sprintf(&buff[count],"[ Process ID  ] [ Active ] [  Process name ] [ start time  ] [   End time   ] [ Elapsed time ]\n");
+	
 	for(;i<processCounter;i++)
 		{
-			count += sprintf(&buff[count],"Process ID = %d , Active = %d, Process name = %s\n, start time = %d, End time = %d Elapsed time  = %d\n",processArray[i]-> id,processArray[i]->active,processArray[i]->name,processArray[i]->start,processArray[i]->end,(int)time(NULL) - processArray[i]->start);
+			count += sprintf(&buff[count],"  %d     %d      %s        %d         %d      %d  \n",processArray[i]-> id,processArray[i]->active,processArray[i]->name,processArray[i]->start,processArray[i]->end,(int)time(NULL) - processArray[i]->start);
 		}
 	
 		write(fd,buff,count);
@@ -345,11 +347,13 @@ void printActiveArray(int fd)
 	
 	char buff[1000];
 	
+	count += sprintf(&buff[count],"[ Process ID  ] [  Process name ] [ start time  ] [   End time   ] [ Elapsed time ]\n");
+	
 	for(;i<processCounter;i++)
 		{
 			if(processArray[i]->active == 1) 
 			  {
-			  	count += sprintf(&buff[count],"Process ID = %d, Process name = %s\n",processArray[i]->id,processArray[i]->name);
+			  	count += sprintf(&buff[count],"%d      %s       %d       %d       %d\n ",processArray[i]->id,processArray[i]->name,processArray[i]->start,processArray[i]->end,(int)time(NULL) - processArray[i]->start);
 			  	
 			  	activeProcesses++;
 			  }
