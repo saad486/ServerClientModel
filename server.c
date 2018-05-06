@@ -42,7 +42,7 @@ void * serverRead(void *ptr);
 
 void printClients();
 
-void saveEndTime(int pid, int end);
+void saveEndTime(int pid, time_t end);
 
 void * serverChildRead(void *ptr);
 //pipes array
@@ -78,8 +78,8 @@ struct acceptConnectionsNode{
 struct Node{
 	int id;
 	int active;
-	int start;
-	int end;
+	time_t start;
+	time_t end;
 	char name[15];	
 };
 //process arrays
@@ -107,7 +107,7 @@ static void signalHandler()
 	
 	int pid = wait(NULL);
 	
-	int timeNoted = (int)time(NULL);
+	time_t timeNoted = time(NULL);
 	saveEndTime(pid,timeNoted);
 	removeProcess(pid); //changing the status of the process to inactive...	
 	
@@ -307,7 +307,7 @@ int checkDigit(char * token)
 	else return 1;
 }
 
-void saveEndTime(int pid, int end)
+void saveEndTime(int pid, time_t end)
 {
 	for(int i = 0;i<processCounter;i++)
 		{
@@ -327,11 +327,31 @@ void printArray(int fd)
 	
 	int count = 0;
 	
+	struct tm * time_sec;
+	
+	struct tm * time_secE;
+	
 	count += sprintf(&buff[count],"[ Process ID  ] [ Active ] [  Process name ] [ start time  ] [   End time   ] [ Elapsed time ]\n");
+	
 	
 	for(;i<processCounter;i++)
 		{
-			count += sprintf(&buff[count],"  %d     %d      %s        %d         %d      %d  \n",processArray[i]-> id,processArray[i]->active,processArray[i]->name,processArray[i]->start,processArray[i]->end,(int)time(NULL) - processArray[i]->start);
+			time_sec = localtime(&(processArray[i]->start));
+			int hrS = time_sec->tm_hour;
+			int mmS = time_sec->tm_min;
+			int ssS = time_sec->tm_sec;
+			
+			int hrE = 0;
+			int mmE = 0;
+			int ssE = 0;
+			if(processArray[i] -> end != -1)
+				{
+					time_secE = localtime(&(processArray[i]->end));
+					hrE = time_sec->tm_hour;
+					mmE = time_sec->tm_min;
+					ssE = time_sec->tm_sec;
+				}
+			count += sprintf(&buff[count],"  %d     :       %d       :    %s    :           %u:%u:%u      :      %u:%u:%u      :         %d\n",processArray[i]-> id,processArray[i]->active,processArray[i]->name,hrS,mmS,ssS,hrE,mmE,ssE,(int)time(NULL) - (int)processArray[i]->start);
 		}
 	
 		write(fd,buff,count);
@@ -347,13 +367,22 @@ void printActiveArray(int fd)
 	
 	char buff[1000];
 	
-	count += sprintf(&buff[count],"[ Process ID  ] [  Process name ] [ start time  ] [   End time   ] [ Elapsed time ]\n");
+	struct tm * time_sec;
+	
+	struct tm * time_secE;
+	
+	count += sprintf(&buff[count],"[ Process ID  ] [  Process name ] [ start time  ] [ Elapsed time ]\n");
 	
 	for(;i<processCounter;i++)
 		{
 			if(processArray[i]->active == 1) 
 			  {
-			  	count += sprintf(&buff[count],"%d      %s       %d       %d       %d\n ",processArray[i]->id,processArray[i]->name,processArray[i]->start,processArray[i]->end,(int)time(NULL) - processArray[i]->start);
+			  	time_sec = localtime(&(processArray[i]->start));
+				int hrS = time_sec->tm_hour;
+				int mmS = time_sec->tm_min;
+				int ssS = time_sec->tm_sec;
+				
+				count += sprintf(&buff[count],"%d      :%s:       %u:%u:%u   : %d\n ",processArray[i]->id,processArray[i]->name,hrS,mmS,ssS,(int)time(NULL) - (int)processArray[i]->start);
 			  	
 			  	activeProcesses++;
 			  }
@@ -778,7 +807,7 @@ int main()
 												processArray[processCounter] -> id = serverPid;
 												strcpy(processArray[processCounter] -> name, runArray[0]);
 												processArray[processCounter] -> active = 1;
-												processArray[processCounter] -> start = (int)time(NULL);
+												processArray[processCounter] -> start = time(NULL);
 												processArray[processCounter] -> end = -1;
 												processCounter++;
 										  		write(msgsock,"Executing...\n",strlen("Executing...\n"));
