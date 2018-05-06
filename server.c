@@ -25,14 +25,73 @@
 #define NOELEMENTS "No elements in the list\n"
 #define HELP "=========================\nWelcome to our program guide:\nType add number1 number2 ...\nType sub number1 number2 ...\nType mult number1 number2 ...\nType div number1 number2 ...\nType run argument1 ...\nType list : To view currenly running processes and list[ all] for all processes executed\nType kill PID, to kill an actively running prcocess\nType exit : to exit our program\nNote: All the operations are not case-sensitve, example: Add, aDD, ADd are valid\nMinimun number of inputs for arthimetic operation is Two\n=========================\n"
 
-//thread1
+//##Structure defintions
+struct showIpAndPortNode{
+	
+	int pid;
+	int socket;
+	int readServerChildId;
+	int writeServerChildId;
+	int readServerId;
+	int writeServerId;
+	int portNo;
+	char ipAddress[INET_ADDRSTRLEN];
+	
+};//client information node
+
+struct ipAndPortArrayNode{
+	
+	int connectionNo;
+	struct showIpAndPortNode *ipAndPortArray[30];
+}; //client list array 
+
+struct ipAndPortArrayNode clientList;
+//array of clients defined globally
+
+struct acceptConnectionsNode{
+	
+	int identifier;
+	struct sockaddr_in clientAddr;
+	int lengthClient;
+		
+};
+//structure passed into accept connection thread;
+
+
+struct Node{
+	int id;
+	int active;
+	time_t start;
+	time_t end;
+	char name[15];	
+};
+//individual process node 
+
+
+struct Node * processArray[30];
+//Node array defined
+int processCounter = 0;
+//process counter for process array
+
+//###method definition#########
+void printProcessArray(int fd);
+//printing the aray
+
+void printActiveProcessArray(int fd);
+//printing the active array
+
+void removeProcess(int processID);
+//changing status to inactive
+
+void printProcessIp(struct showIpAndPortNode * pipeInput);
+
+void printClientProcess(struct showIpAndPortNode * pipeInput);
+
+int checkDigit(char * token);
+
+char* methodArithmetic(char * token, char * buff);
+
 void * acceptConnections(void * ptr);
-
-void removePipeDescriptors(int pid);
-
-void setPortNo(int port);
-
-int getPortNo();
 
 int getIndexClient(int pid);
 
@@ -45,61 +104,6 @@ void printClients();
 void saveEndTime(int pid, time_t end);
 
 void * serverChildRead(void *ptr);
-//pipes array
-
-struct showIpAndPortNode{
-	
-	int pid;
-	int socket;
-	int readServerChildId;
-	int writeServerChildId;
-	int readServerId;
-	int writeServerId;
-	int portNo;
-	char ipAddress[INET_ADDRSTRLEN];
-	
-};
-
-struct ipAndPortArrayNode{
-	
-	int connectionNo;
-	struct showIpAndPortNode *ipAndPortArray[30];
-};
-struct ipAndPortArrayNode clientList;
-
-struct acceptConnectionsNode{
-	
-	int identifier;
-	struct sockaddr_in clientAddr;
-	int lengthClient;
-		
-};
-
-struct Node{
-	int id;
-	int active;
-	time_t start;
-	time_t end;
-	char name[15];	
-};
-//process arrays
-void printProcessArray(int fd);
-
-void printActiveProcessArray(int fd);
-
-//making process appear in active in list
-void removeProcess(int processID);
-
-void printProcessIp(struct showIpAndPortNode * pipeInput);
-
-void printClientProcess(struct showIpAndPortNode * pipeInput);
-//Node array 
-struct Node * processArray[30];//if typed exit then it will be freed
-int processCounter = 0;
-
-int checkDigit(char * token);
-
-char* methodArithmetic(char * token, char * buff);
 
 static void signalHandler()
 {
@@ -906,7 +910,7 @@ void * serverRead(void *ptr)
 	
 			int readCount = read(STDIN_FILENO,readBuff,100);
 	
-			char * token = strtok(readBuff," \n");
+			char * token = strtok(readBuff," ");
 	
 			char result[1000];
 	
@@ -957,9 +961,27 @@ void * serverRead(void *ptr)
 					{
 						printClients();
 					}
+					
 					else write(STDOUT_FILENO,"Invalid command\n",strlen("Invalid command\n"));
 					
 				}
+				else if(strcasecmp(token,"say") == 0)
+					{
+							char sayBuff[500];
+							//readBuff[readCount - 1] = '\n';
+							token = strtok(NULL,"\n");
+							strcpy(sayBuff,token);
+							
+							char respondBuff[500];
+							int sCount = sprintf(respondBuff,"Server says : %s \n",sayBuff);
+							
+							for(int i=0; i<clientList.connectionNo; i++)
+								{
+									
+									write(clientList.ipAndPortArray[i] -> socket,respondBuff,sCount);
+								}
+							
+					}
 				else write(STDOUT_FILENO,"Invalid command\n",strlen("Invalid command\n"));
 				
 		}
