@@ -84,47 +84,66 @@ void removeProcess(int processID);
 //changing status to inactive
 
 void printProcessIp(struct showIpAndPortNode * pipeInput);
+//printing server port and ip on the screen
 
 void printClientProcess(struct showIpAndPortNode * pipeInput);
+//printing client processes on the screen; command given by the server
 
 int checkDigit(char * token);
+//checking if arguments for the arthimentics are valid or not
 
 char* methodArithmetic(char * token, char * buff);
+//method to handle arthimetic
 
 void * acceptConnections(void * ptr);
+//thread for accepting connection
 
 int getIndexClient(int pid);
+//this method is called by the child server method of locating the child in array with the help of pid
 
 void removeProcessClient(int pid);
+//this process removes the child from parent server list once the child has disconnected
 
 void * serverRead(void *ptr);
+//thread for parent process read
 
 void printClients();
+//server process method to get the list o
 
 void saveEndTime(int pid, time_t end);
 
 void * serverChildRead(void *ptr);
+//thread for server Child
 
 static void signalHandler()
 {
 	int status;
+	int pid;
 	
-	int pid = wait(NULL);
+	do{
+	pid = waitpid(-1,&status,WNOHANG);
 	
-	time_t timeNoted = time(NULL);
-	saveEndTime(pid,timeNoted);
-	removeProcess(pid); //changing the status of the process to inactive...	
+	if(pid == -1)
+		{
+			perror("error");
+			exit(1);
+		}
 	
+	if(pid > 0)
+		{	time_t timeNoted = time(NULL);
+			saveEndTime(pid,timeNoted);
+			removeProcess(pid); //changing the status of the process to inactive...	
+		}
+	}while(pid == 0);
 }
-
-
+//signal handler for server child to remove make its processes appear inactive
 static void signalHandlerClient()
 {
 		int pid = wait(NULL);
 		removeProcessClient(pid);
 		
 }
-
+//signal handler for server parent to remove client from its client list
 void printIpAndPort(int portNumber, char * ipAddress)
 {
 	int port = ntohs(portNumber);
@@ -162,7 +181,7 @@ void killProcessByName(char * token, int fd)
 			
 			for(int i = 0; i<processCounter; i++)
 			{
-				if(strcmp(processArray[i]->name, token) == 0)
+				if(strcmp(processArray[i]->name, token) == 0 && processArray[i]->active == 1) 
 						{	
 							returnID = i;
 							break;
@@ -182,6 +201,7 @@ void killProcessByName(char * token, int fd)
 			else write(fd,"Process has already terminated or is not in the list\n",strlen("Process has already terminated or is not in the list\n"));
 		}	
 }
+//killing process by name
 char* methodArithmetic(char * token, char * buff)
 {
 	char * identifier = token;
@@ -285,7 +305,7 @@ char* methodArithmetic(char * token, char * buff)
 	return buff; 	
 
 }	
-
+//check digit for finding any character other than numbers
 int checkDigit(char * token)
 {
 	int i = 0;
@@ -310,7 +330,7 @@ int checkDigit(char * token)
 
 	else return 1;
 }
-
+//recording end time
 void saveEndTime(int pid, time_t end)
 {
 	for(int i = 0;i<processCounter;i++)
@@ -335,7 +355,7 @@ void printArray(int fd)
 	
 	struct tm * time_secE;
 	
-	count += sprintf(&buff[count],"[ Process ID  ] [ Active ] [  Process name ] [ start time  ] [   End time   ] [ Elapsed time ]\n");
+	count += sprintf(&buff[count],"[ Process ID  ] [ Active ] [ start time  ] [   End time   ] [ Elapsed time ] [  Process name ]\n");
 	
 	
 	for(;i<processCounter;i++)
@@ -355,7 +375,7 @@ void printArray(int fd)
 					mmE = time_sec->tm_min;
 					ssE = time_sec->tm_sec;
 				}
-			count += sprintf(&buff[count],"  %d     :       %d       :    %s    :           %u:%u:%u      :      %u:%u:%u      :         %d\n",processArray[i]-> id,processArray[i]->active,processArray[i]->name,hrS,mmS,ssS,hrE,mmE,ssE,(int)time(NULL) - (int)processArray[i]->start);
+			count += sprintf(&buff[count],"  %d : %d  :%u:%u:%u : %u:%u:%u : %d :: %s :\n",processArray[i]-> id,processArray[i]->active,hrS,mmS,ssS,hrE,mmE,ssE,(int)time(NULL) - (int)processArray[i]->start,processArray[i]->name);
 		}
 	
 		write(fd,buff,count);
@@ -375,7 +395,7 @@ void printActiveArray(int fd)
 	
 	struct tm * time_secE;
 	
-	count += sprintf(&buff[count],"[ Process ID  ] [  Process name ] [ start time  ] [ Elapsed time ]\n");
+	count += sprintf(&buff[count],"[ Process ID  ][ start time  ][ Elapsed time ][ Process name ]\n");
 	
 	for(;i<processCounter;i++)
 		{
@@ -386,7 +406,7 @@ void printActiveArray(int fd)
 				int mmS = time_sec->tm_min;
 				int ssS = time_sec->tm_sec;
 				
-				count += sprintf(&buff[count],"%d      :%s:       %u:%u:%u   : %d\n ",processArray[i]->id,processArray[i]->name,hrS,mmS,ssS,(int)time(NULL) - (int)processArray[i]->start);
+				count += sprintf(&buff[count],"%d  %u:%u:%u  %d  %s\n ",processArray[i]->id,hrS,mmS,ssS,(int)time(NULL) - (int)processArray[i]->start,processArray[i]->name);
 			  	
 			  	activeProcesses++;
 			  }
@@ -401,7 +421,7 @@ void printActiveArray(int fd)
 	
 	else write(fd,"Currently no active processes listed\n",strlen("Currently no active processes listed\n"));	
 }
-
+//remove active array
 void removeProcess(int pid)
 {
 	int i;
@@ -423,9 +443,9 @@ int main()
 	int sock, length;
 	struct sockaddr_in server, client;
 	int writeCountSocket = 0;
-	int readCountSocket = 1;
+	int readCountSocket = 0;
 	char * runArray[20];
-	int moreThanOneThreads = 0;
+	int moreThanOneThreads = 0;//to ensure only one server read thread is connected
 	
 	if(signal(SIGCHLD, signalHandlerClient) == SIG_ERR)
 		{
@@ -461,11 +481,12 @@ int main()
 	char str[INET_ADDRSTRLEN];
 	inet_ntop(AF_INET, (void *)&server.sin_addr.s_addr, str,INET_ADDRSTRLEN);
 	
-	printIpAndPort(server.sin_port,str);
+	printIpAndPort(server.sin_port,str);//print port number on the server screen
 	
 	/* listening for connections*/
 	listen(sock, 5);
 	
+	//detach thread attributes
 	pthread_t readThread;
 	pthread_attr_t myattr;
 	pthread_attr_init(&myattr);
@@ -473,7 +494,7 @@ int main()
 	//user control of server
 	
 	do{
-		pthread_t connectThread;
+		pthread_t connectThread;//connection accepting thread
 		int clientLength = sizeof(client);
 		
 		//connector Node setting which will be passed to connectThread
@@ -483,13 +504,14 @@ int main()
 		connector.lengthClient = clientLength;
 		struct showIpAndPortNode *clientInformation;
 		
-		
+		//thread creation
 		int iret1 = pthread_create(&connectThread, NULL ,acceptConnections,(void *)&connector);
 		//waiting for the thread
 		void *readMessage;
-		
+		//waiting for the thread
 		pthread_join(connectThread, &readMessage);
 		
+		//storing the information in clientlist node
 		clientInformation = (struct showIpAndPortNode *)readMessage;
 	
 		int msgsock =  clientInformation->socket;
@@ -497,8 +519,7 @@ int main()
 		clientList.ipAndPortArray[clientList.connectionNo] = clientInformation;
 		clientList.connectionNo++;
 		
-		//setPortNo(clientInformation->portNo );//set port number is set method 
-		
+		//creating pipes between server thread of parent and the child server thread
 		int pipeDescriptors[2];
 		int pipeDescriptorsOne[2];
 		
@@ -506,12 +527,14 @@ int main()
 		
 		pipe(pipeDescriptorsOne);
 		
+		//saving pipes id in clientlist node, so that they are available to both server parent and child thread
 		clientInformation->writeServerId = pipeDescriptors[1];
 		clientInformation->readServerId = pipeDescriptorsOne[0];
 		
 		clientInformation->readServerChildId = pipeDescriptors[0];
 		clientInformation->writeServerChildId = pipeDescriptorsOne[1];
 		
+		//one time thread creation for the parent server
 		int iret2;
 		
 		if(moreThanOneThreads == 0)
@@ -534,7 +557,8 @@ int main()
 				{
 				perror("error binding handling SIGCHLD"); 
 				}
-						
+				
+				//creation of thread for child server		
 				int iret3 = pthread_create(&serverChildThread, &myattr ,serverChildRead,(void *)clientInformation);
 				
 				do{
@@ -544,53 +568,63 @@ int main()
 						
 						int status = 1;
 						
-						int readCountSocket = 0;
+						 writeCountSocket = 0;
+						
+						 readCountSocket = 0;
+						
+						int bufferOverFlow = 0;
 						
 						char readBuff;
 						
-						while(status != 0 )
+						while(status != 0)
 							{															
 								int readFromSocket = read(msgsock,&readBuff,1);
 								
 								if(readFromSocket == 0)
 									break;
-							
+								
+								
 								readBuffSocket[readCountSocket] = readBuff;
 								
+								if(status > 100) //note: not the best way to handle buffer overflow error but gets the job done in my case
+										{
+											bufferOverFlow = 1;
+											break;
+										}
 								readCountSocket++;
 							
 								ioctl(msgsock,FIONREAD, &status);
 							}
+							
+						char * arthimeticBuff = (char *)malloc(200*sizeof(char));
 						
-						char * arthimeticBuff = (char *)malloc(50*sizeof(char));
+						int argumentRunArray = 0;//for run arguments counter
 						
-						int argumentRunArray = 0;
+						char * resultBuff;//for arthimetic operations
 						
-						char * resultBuff;
+						int ignore = 0;//for run method, an ignore check
 						
-						int ignore = 0;
-						
-						if(readCountSocket == 0)
+						if(readCountSocket == 0)//client disconnected for some reasons
 						 		{
 						 			write(STDOUT_FILENO, "Connection ended\n",strlen("Connection ended\n"));
+						 			killProcessByName("all", STDOUT_FILENO);//i have used the same method for killing by name (all) 
 						 			exit(EXIT_SUCCESS);
 						 		}
 					
 						char * token;
 						
-						if(readCountSocket - 1 == 0)
-							token = "a"; //garbage
+						if(readCountSocket - 1 == 0 || bufferOverFlow == 1)
+							token = "a"; //garbase value so that no if else conditions becomes true
 							
 						else token = strtok(readBuffSocket," \n");
 						
 						//case comparing 
-						
+
 						if(strcasecmp("add",token) == 0)
 						{
 							char * resultBuff = methodArithmetic(token, arthimeticBuff);
-		
+							
 							writeCountSocket = write(msgsock, resultBuff, strlen(arthimeticBuff));
-		 			
 						}
 						else if(strcasecmp("sub",token) == 0)
 						{
@@ -626,7 +660,7 @@ int main()
 									{	
 										if( i == 0)
 										{	
-											runArray[i] = (char *)malloc(30*sizeof(char));
+											runArray[i] = (char *)malloc(30*sizeof(char));//filling the arguments for exec
 											
 											strcpy(runArray[i],token);
 											
@@ -650,7 +684,8 @@ int main()
 								ignore = 1;
 							
 								}
-						}	
+						}
+						//listing processes	
 						else if(strcasecmp("list",token) == 0)
 						{
 							if(processCounter > 0)
@@ -660,7 +695,7 @@ int main()
 									if(token == NULL)
 										printActiveArray(msgsock);
 					
-									else if(strcmp(token,"all") == 0)	//check why tokenizing first and checking caused the problem
+									else if(strcmp(token,"all") == 0)
 									{	
 										if((token = strtok(NULL," \n")) == NULL)
 												printArray(msgsock);
@@ -732,7 +767,10 @@ int main()
 							token = strtok(NULL," \n");
 		
 							if(token == NULL)
-								write(msgsock,"Connection disconnected\n",strlen("Connection Disconnected\n"));
+								{	killProcessByName("all", STDOUT_FILENO);
+									write(msgsock,"Connection disconnected\n",strlen("Connection Disconnected\n"));
+									exit(EXIT_SUCCESS);//test
+								}
 									
 							else write(msgsock,MESSAGE,strlen(MESSAGE));		
 						}
@@ -743,17 +781,26 @@ int main()
 							if(token == NULL)
 									{	write(msgsock,"Connection terminated\n",strlen("Connection terminated\n"));
 										write(STDOUT_FILENO,"Exited\n",strlen("Exited\n"));
+										killProcessByName("all", STDOUT_FILENO);
 										exit(EXIT_SUCCESS);//test
 									}
 							else write(msgsock,MESSAGE,strlen(MESSAGE));		
 						}
 						else{
-							writeCountSocket = write(msgsock, "Invalid command\n", strlen("Invalid command\n"));
+							if(bufferOverFlow == 1)
+							{
+								char dumpBuffer[1000];
+								
+								read(msgsock,dumpBuffer,1000); //if bufferOverFlow is true, then to dump rest of the data from the socket empty, a dumpBuffer is user so that socket becomes empty
+								
+								writeCountSocket = write(msgsock, "Buffer overflow!\n", strlen("Buffer overflow!\n"));
+							}
+							else writeCountSocket = write(msgsock, "Invalid command\n", strlen("Invalid command\n"));
 						}
 						
 						//###Running processes on the server#####
 						
-						if(ignore == 1)
+						if(ignore == 1)//ignore check becomes true when a run command is given
 							{
 							 
 							 	int status;
@@ -766,7 +813,7 @@ int main()
 										{
 											perror("error");
 										}
-											fcntl(sd[1],F_SETFD,FD_CLOEXEC);
+											fcntl(sd[1],F_SETFD,FD_CLOEXEC);//pipe closing on exec
 		
 									int serverPid = fork();
 									 
@@ -785,7 +832,7 @@ int main()
 													
 													perror("error");
 													
-													write(sd[1],"salman",6);
+													write(sd[1],"salman",6);//some random character to make condition in child false
 													
 													close(sd[1]);
 													
@@ -806,7 +853,7 @@ int main()
 										
 										if(count == 0)
 											{
-					
+												//filling the process array
 												processArray[processCounter] = (struct Node *)(malloc(50*sizeof(struct Node))); 
 												processArray[processCounter] -> id = serverPid;
 												strcpy(processArray[processCounter] -> name, runArray[0]);
@@ -832,11 +879,10 @@ int main()
 							}
 						
 						for(int j = 0 ;j<argumentRunArray; j++)
-									free(runArray[j]);
+									free(runArray[j]);//freeing the memory
 						
-						//free(readBuffSocket);	
 						
-						free(arthimeticBuff);	
+						free(arthimeticBuff); 	
 							
 						resultBuff = NULL;
 						
@@ -844,12 +890,12 @@ int main()
 				//client and child server communication###########
 					
 					}while(readCountSocket != 0); 
-				close(msgsock);
+				close(msgsock);//closing the socket after the disconnet or exit
 			}
 		
 		else if(serverChild > 0)
 		{
-		clientInformation->pid = serverChild;
+		clientInformation->pid = serverChild;//storing the pid in clientList node
 		
 		close(pipeDescriptors[0]);
 		
@@ -862,6 +908,7 @@ int main()
 }
 
 //thread 1
+//It accepts information and stores some in clientList node. And passes that to return value in pthread_join
 void * acceptConnections(void * ptr)
 {
 	int * sock = (int *)ptr;
@@ -897,7 +944,15 @@ void * acceptConnections(void * ptr)
 	pthread_exit((void *)clientInformation);//return struct
 	}
 }
+//server Read thread which makes server parent interactivr
+/*
+some basic commands it can respond to\
+-list processes
+-list client
+-list processes IP
+-say ----  //write anything after say followed by space; it will be broadcasted to every client
 
+*/
 void * serverRead(void *ptr)
 {
 	while(1)
@@ -905,7 +960,7 @@ void * serverRead(void *ptr)
 			char readBuff[100];
 			
 			bzero(readBuff,100);
-	
+			
 			write(STDOUT_FILENO,"Enter the command:\n",strlen("Enter the command:\n"));
 	
 			int readCount = read(STDIN_FILENO,readBuff,100);
@@ -950,7 +1005,7 @@ void * serverRead(void *ptr)
 							}
 							else{
 									for(int i = 0; i < clientList.connectionNo;i++)
-										{	int readCount = write(clientList.ipAndPortArray[i]->writeServerId,"Give Processes\n",strlen("Give Processes\n"));
+										{	int readCount = write(clientList.ipAndPortArray[i]->writeServerId,"Give Processes\n",strlen("Give Processes\n"));//some random string to pass the value to the pipes
 									
 											count = read(clientList.ipAndPortArray[i]->readServerId,result,1000);
 												write(STDOUT_FILENO,result,count);
@@ -967,7 +1022,8 @@ void * serverRead(void *ptr)
 				}
 				else if(strcasecmp(token,"say") == 0)
 					{
-							char sayBuff[500];
+						if(clientList.connectionNo !=0 )
+						{	char sayBuff[500];
 							//readBuff[readCount - 1] = '\n';
 							token = strtok(NULL,"\n");
 							strcpy(sayBuff,token);
@@ -981,12 +1037,13 @@ void * serverRead(void *ptr)
 									write(clientList.ipAndPortArray[i] -> socket,respondBuff,sCount);
 								}
 							
-					}
-				else write(STDOUT_FILENO,"Invalid command\n",strlen("Invalid command\n"));
-				
+						}
+					else write(STDOUT_FILENO,"No clients to broadcast\n",strlen("No clients to broadcast\n"));
+				}
+			else write(STDOUT_FILENO,"Invalid command\n",strlen("Invalid command\n"));
 		}
 }
-
+//thread of child responding to the parent server read
 void * serverChildRead(void *ptr)
 {
 	while(1)
@@ -1007,6 +1064,7 @@ void * serverChildRead(void *ptr)
 	}
 
 }
+//print client on parent server
 void printClients()
 {
 	char readListBuff[1000];
@@ -1025,7 +1083,7 @@ void printClients()
 		write(STDOUT_FILENO, readListBuff, noOfClients);
 	}	
 }
-
+//print processes plus ip on server parent
 void printProcessIp(struct showIpAndPortNode * pipeInput)
 {
 	int i = 0;
@@ -1047,6 +1105,7 @@ void printProcessIp(struct showIpAndPortNode * pipeInput)
 		write(pipeInput->writeServerChildId,buff,count);
 } 
 
+//print all of the client processes on parent server
 void printClientProcess(struct showIpAndPortNode * pipeInput)
 {
 	int i = 0;
@@ -1069,7 +1128,7 @@ void printClientProcess(struct showIpAndPortNode * pipeInput)
 		}
 		write(pipeInput->writeServerChildId,buff,count);
 }
-
+//search the index in clientList by the help of the pid extracted from the signal handler
 int getIndexClient(int pid)
 {
 	int returnIndex;
@@ -1084,7 +1143,7 @@ int getIndexClient(int pid)
 		}
 	return returnIndex;
 }
-
+//remove the node from client list, searching by the pid
 void removeProcessClient(int pid)
 {
 	int index = getIndexClient(pid);
