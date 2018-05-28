@@ -4,7 +4,7 @@ It is just a university (ongoing) project. I have emulated server and client com
 # how to use this on linux terminal
 1) Open two terminals in directory you have cloned.
 2) Compile the program with the gcc compiler.
-3) execute the server with "./server" (if I have compiled it like :gcc -o server server.c).
+3) execute the server with "./server" (if I have compiled it like :gcc -pthread server.c -o server).
 4) Server will print the port number it is listening on.
 5) Compile the client in the similar manner.
 6) In client,the port number printed by the server is passed as an argument preceeded by ip address.
