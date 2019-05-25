@@ -1,7 +1,9 @@
-# ServerClientModel
-It is just a university (ongoing) project. I have emulated server and client communication of basic commands give in the help command
+## Multithreaded Server Client Model
+It is a multithreaded server and client. It is developed in language C and linux system APIs are used for 
 
-# how to use this on linux terminal
+
+# how to use this on linux terminal 
+```
 1) Open two terminals in directory you have cloned.
 2) Compile the program with the gcc compiler.
 3) execute the server with "./server" (if I have compiled it like :gcc -pthread server.c -o server).
@@ -10,4 +12,4 @@ It is just a university (ongoing) project. I have emulated server and client com
 6) In client,the port number printed by the server is passed as an argument preceeded by ip address.
 7) Like ./client localhost/127.0.0.1 ##### (ip would be different if server and client are running on a separate machines.Type the relevant the port number in place of #).
 8) Commands guide is given in the help command. type help.
-
+```
