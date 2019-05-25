@@ -1,8 +1,8 @@
-## Multithreaded Server Client Model
-It is a multithreaded server and client. It is developed in language C and linux system APIs are used for 
+# Multithreaded Server Client Model
+It is a multithreaded server and client. It is developed in language C and it uses linux system APIs. 
 
 
-# how to use this on linux terminal 
+## how to use this on linux terminal 
 ```
 1) Open two terminals in directory you have cloned.
 2) Compile the program with the gcc compiler.
